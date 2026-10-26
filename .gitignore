@@ -1,0 +1,18 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Build artifacts
+bin/
+dist/
+*.out
+coverage.out
+
+# Editor and OS
+.DS_Store
+.idea/
+.vscode/
