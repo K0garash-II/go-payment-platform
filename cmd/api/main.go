@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
-	"github.com/K0garash-II/go-payment-platform/internal/httpapi"
+	"go-payment-platform/internal/httpapi"
 )
 
 func main() {
