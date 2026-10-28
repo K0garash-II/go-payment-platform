@@ -2,16 +2,16 @@ package main
 
 import (
 	"fmt"
-	"net/http"
 	"go-payment-platform/internal/httpapi"
+	"go-payment-platform/internal/payment"
 	"go-payment-platform/internal/storage/memory"
+	"net/http"
 )
-
-
 
 func main() {
 	store := memory.NewStore()
-	router := httpapi.NewRouter(store)
+	p := payment.NewService(store)
+	router := httpapi.NewRouter(store, p)
 
 	err := http.ListenAndServe(":8080", router)
 	if err != nil {

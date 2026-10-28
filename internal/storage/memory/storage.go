@@ -36,6 +36,21 @@ func (s *Store) GetAccount(id int) (account.Account, bool) {
     return acc, ok
 }
 
+func (s *Store) Deposit(id int, amount int64) (account.Account, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	acc, ok := s.Accounts[id]
+	if !ok {
+		return account.Account{}, false
+	}
+
+	acc.Balance += amount
+	s.Accounts[id] = acc
+
+	return acc, true
+}
+
 func NewStore() *Store {
 	return &Store{
 		Accounts: make(map[int]account.Account),
