@@ -4,10 +4,14 @@ import (
 	"fmt"
 	"net/http"
 	"go-payment-platform/internal/httpapi"
+	"go-payment-platform/internal/storage/memory"
 )
 
+
+
 func main() {
-	router := httpapi.NewRouter()
+	store := memory.NewStore()
+	router := httpapi.NewRouter(store)
 
 	err := http.ListenAndServe(":8080", router)
 	if err != nil {
