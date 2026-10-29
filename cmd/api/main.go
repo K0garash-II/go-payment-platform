@@ -11,7 +11,7 @@ import (
 func main() {
 	store := memory.NewStore()
 	p := payment.NewService(store)
-	router := httpapi.NewRouter(store, p)
+	router := httpapi.NewRouter(p)
 
 	err := http.ListenAndServe(":8080", router)
 	if err != nil {

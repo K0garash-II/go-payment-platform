@@ -18,10 +18,28 @@ func NewService(store AccountStore) *Service {
 }
 
 type AccountStore interface {
+	CreateAccount(owner string) account.Account
+	GetAccount(id int) (account.Account, error)
 	Deposit(id int, amount int64) (account.Account, error)
 	Transfer(fromID, toID int, amount int64) error
-	GetAccount(id int) (account.Account, bool)
 	GetTransactions(accountID int) []transaction.Transaction
+}
+
+func (s *Service) CreateAccount(owner string) account.Account {
+	acc := s.store.CreateAccount(owner)
+	return acc
+}
+
+func (s *Service) GetAccount(id int) (account.Account, error) {
+	acc, err := s.store.GetAccount(id)
+	if errors.Is(err, storage.ErrAccountNotFound) {
+		return account.Account{}, ErrAccountNotFound
+	}
+	if err != nil {
+		return account.Account{}, err
+	}
+
+	return acc, nil
 }
 
 func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
@@ -64,8 +82,8 @@ func (s *Service) Transfer(fromID, toID int, amount int64) error {
 }
 
 func (s *Service) GetTransactions(accountID int) ([]transaction.Transaction, error) {
-	_, found := s.store.GetAccount(accountID)
-	if !found {
+	_, err := s.store.GetAccount(accountID)
+	if err != nil {
 		return nil, ErrAccountNotFound
 	}
 

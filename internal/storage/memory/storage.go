@@ -33,12 +33,15 @@ func (s *Store) CreateAccount(owner string) account.Account {
 	return acc
 }
 
-func (s *Store) GetAccount(id int) (account.Account, bool) {
+func (s *Store) GetAccount(id int) (account.Account, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
 	acc, ok := s.Accounts[id]
-	return acc, ok
+	if !ok {
+		return account.Account{}, storage.ErrAccountNotFound
+	}
+	return acc, nil
 }
 
 func (s *Store) Deposit(id int, amount int64) (account.Account, error) {
