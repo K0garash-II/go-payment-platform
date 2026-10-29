@@ -2,8 +2,10 @@ package httpapi
 
 import (
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
 
@@ -13,9 +15,10 @@ import (
 )
 
 func setupTestServer() http.Handler {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 	store := memory.NewStore()
 	service := payment.NewService(store)
-	return NewRouter(service)
+	return NewRouter(service, logger)
 }
 
 func sendRequest(
