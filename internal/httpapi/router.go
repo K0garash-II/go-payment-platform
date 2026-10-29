@@ -110,6 +110,33 @@ func DepositAccount(p *payment.Service) http.HandlerFunc {
 	}
 }
 
+func GetAccountTransactions(p *payment.Service) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		id := r.PathValue("id")
+		idInt, err := strconv.Atoi(id)
+		if err != nil {
+			http.Error(w, "invalid account ID", http.StatusBadRequest)
+			return
+		}
+
+		accTrans, err := p.GetTransactions(idInt)
+		if errors.Is(err, payment.ErrAccountNotFound) {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+
+		if err != nil {
+			http.Error(w, "internal server error", http.StatusInternalServerError)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		json.NewEncoder(w).Encode(accTrans)
+
+	}
+}
+
 func NewRouter(store *memory.Store, p *payment.Service) http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", check)
@@ -117,6 +144,7 @@ func NewRouter(store *memory.Store, p *payment.Service) http.Handler {
 	mux.HandleFunc("POST /accounts", CreateAccount(store))
 	mux.HandleFunc("GET /accounts/{id}", GetAccount(store))
 	mux.HandleFunc("POST /accounts/{id}/deposit", DepositAccount(p))
+	mux.HandleFunc("GET /accounts/{id}/transactions", GetAccountTransactions(p))
 
 	return mux
 }
