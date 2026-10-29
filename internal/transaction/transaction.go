@@ -1,4 +1,4 @@
-package payment
+package transaction
 
 import "time"
 

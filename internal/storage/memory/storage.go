@@ -2,7 +2,8 @@ package memory
 
 import (
 	"go-payment-platform/internal/account"
-	"go-payment-platform/internal/payment"
+	"go-payment-platform/internal/storage"
+	"go-payment-platform/internal/transaction"
 	"sync"
 	"time"
 )
@@ -10,7 +11,7 @@ import (
 type Store struct {
 	Accounts          map[int]account.Account
 	NextID            int
-	Transactions      []payment.Transaction
+	Transactions      []transaction.Transaction
 	NextTransactionID int
 	mu                sync.RWMutex
 }
@@ -40,23 +41,23 @@ func (s *Store) GetAccount(id int) (account.Account, bool) {
 	return acc, ok
 }
 
-func (s *Store) Deposit(id int, amount int64) (account.Account, bool) {
+func (s *Store) Deposit(id int, amount int64) (account.Account, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	acc, ok := s.Accounts[id]
 	if !ok {
-		return account.Account{}, false
+		return account.Account{}, storage.ErrAccountNotFound
 	}
 
 	acc.Balance += amount
 	s.Accounts[id] = acc
 
-	transaction := payment.Transaction{
-		ID: s.NextTransactionID,
+	transaction := transaction.Transaction{
+		ID:        s.NextTransactionID,
 		AccountID: id,
-		Type: "deposit",
-		Amount: amount,
+		Type:      "deposit",
+		Amount:    amount,
 		CreatedAt: time.Now(),
 	}
 
@@ -64,21 +65,67 @@ func (s *Store) Deposit(id int, amount int64) (account.Account, bool) {
 
 	s.NextTransactionID += 1
 
-	return acc, true
+	return acc, nil
 }
 
-func (s *Store) GetTransactions(accountID int) []payment.Transaction {
+func (s *Store) Transfer(fromID, toID int, amount int64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	accountFrom, ok := s.Accounts[fromID]
+	if !ok {
+		return storage.ErrAccountNotFound
+	}
+	accountTo, ok := s.Accounts[toID]
+	if !ok {
+		return storage.ErrAccountNotFound
+	}
+
+	if accountFrom.Balance < amount {
+		return storage.ErrInsufficientFunds
+	}
+
+	accountFrom.Balance -= amount
+	accountTo.Balance += amount
+
+	s.Accounts[fromID] = accountFrom
+	s.Accounts[toID] = accountTo
+
+	transactionFrom := transaction.Transaction{
+		ID:        s.NextTransactionID,
+		AccountID: fromID,
+		Type:      "transfer",
+		Amount:    -amount,
+		CreatedAt: time.Now(),
+	}
+	s.NextTransactionID += 1
+	s.Transactions = append(s.Transactions, transactionFrom)
+
+	transactionTo := transaction.Transaction{
+		ID:        s.NextTransactionID,
+		AccountID: toID,
+		Type:      "transfer",
+		Amount:    amount,
+		CreatedAt: time.Now(),
+	}
+	s.NextTransactionID += 1
+	s.Transactions = append(s.Transactions, transactionTo)
+
+	return nil
+}
+
+func (s *Store) GetTransactions(accountID int) []transaction.Transaction {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	accTransactions := make([]payment.Transaction, 0)
+	accTransactions := make([]transaction.Transaction, 0)
 
 	for i := range s.Transactions {
 		if s.Transactions[i].AccountID == accountID {
 			accTransactions = append(accTransactions, s.Transactions[i])
 		}
 	}
-	
+
 	return accTransactions
 }
 
@@ -86,7 +133,7 @@ func NewStore() *Store {
 	return &Store{
 		Accounts:          make(map[int]account.Account),
 		NextID:            1,
-		Transactions:      make([]payment.Transaction, 0),
+		Transactions:      make([]transaction.Transaction, 0),
 		NextTransactionID: 1,
 	}
 }
