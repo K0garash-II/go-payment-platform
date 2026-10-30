@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"go-payment-platform/internal/handler"
+	"go-payment-platform/internal/middleware"
 	"go-payment-platform/internal/payment"
 )
 
@@ -24,5 +25,5 @@ func NewRouter(p *payment.Service, logger *slog.Logger) http.Handler {
 	mux.HandleFunc("POST /transfers", h.TransferAccount)
 	mux.HandleFunc("GET /accounts/{id}/transactions", h.GetAccountTransactions)
 
-	return mux
+	return middleware.LoggingMiddleware(logger)(mux)
 }
