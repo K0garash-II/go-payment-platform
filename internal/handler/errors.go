@@ -22,6 +22,9 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, payment.ErrSameAccount):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
+	case errors.Is(err, payment.ErrBalanceOverflow):
+		http.Error(w, err.Error(), http.StatusBadRequest)
+
 	default:
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}

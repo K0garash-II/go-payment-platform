@@ -2,9 +2,9 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
-	"strings"
 
 	"go-payment-platform/internal/dto"
 )
@@ -12,18 +12,30 @@ import (
 func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var input dto.CreateAccountRequest
 
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+	if err := decodeJSON(w, r, &input); err != nil {
+		if errors.Is(err, ErrInvalidJSON) {
+			http.Error(w, "invalid JSON", http.StatusBadRequest)
+			return
+		}
+		if errors.Is(err, ErrBodyTooLarge) {
+			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	input.Owner = strings.TrimSpace(input.Owner)
-	if input.Owner == "" {
-		http.Error(w, "Bad request", http.StatusBadRequest)
+	owner, err := validateOwner(input.Owner)
+	if err != nil {
+		if errors.Is(err, ErrInvalidOwner) {
+			http.Error(w, "Bad request", http.StatusBadRequest)
+			return
+		}
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	acc := h.service.CreateAccount(input.Owner)
+	acc := h.service.CreateAccount(owner)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)

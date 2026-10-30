@@ -7,4 +7,5 @@ var (
 	ErrAccountNotFound   = errors.New("account not found")
 	ErrInsufficientFunds = errors.New("insufficient funds")
 	ErrSameAccount       = errors.New("same account")
+	ErrBalanceOverflow   = errors.New("balance overflow")
 )

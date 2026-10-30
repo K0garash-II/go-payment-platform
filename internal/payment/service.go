@@ -51,6 +51,9 @@ func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return account.Account{}, ErrAccountNotFound
 	}
+	if errors.Is(err, storage.ErrBalanceOverflow) {
+		return account.Account{}, ErrBalanceOverflow
+	}
 	if err != nil {
 		return account.Account{}, err
 	}
@@ -73,6 +76,9 @@ func (s *Service) Transfer(fromID, toID int, amount int64) error {
 	}
 	if errors.Is(err, storage.ErrInsufficientFunds) {
 		return ErrInsufficientFunds
+	}
+	if errors.Is(err, storage.ErrBalanceOverflow) {
+		return ErrBalanceOverflow
 	}
 	if err != nil {
 		return err

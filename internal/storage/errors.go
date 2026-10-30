@@ -5,4 +5,5 @@ import "errors"
 var (
 	ErrInsufficientFunds = errors.New("insufficient funds")
 	ErrAccountNotFound   = errors.New("account not found")
+	ErrBalanceOverflow   = errors.New("balance overflow")
 )

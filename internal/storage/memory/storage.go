@@ -4,6 +4,7 @@ import (
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
 	"go-payment-platform/internal/transaction"
+	"math"
 	"sync"
 	"time"
 )
@@ -52,7 +53,9 @@ func (s *Store) Deposit(id int, amount int64) (account.Account, error) {
 	if !ok {
 		return account.Account{}, storage.ErrAccountNotFound
 	}
-
+	if acc.Balance > math.MaxInt64-amount {
+		return account.Account{}, storage.ErrBalanceOverflow
+	}
 	acc.Balance += amount
 	s.Accounts[id] = acc
 
@@ -86,6 +89,10 @@ func (s *Store) Transfer(fromID, toID int, amount int64) error {
 
 	if accountFrom.Balance < amount {
 		return storage.ErrInsufficientFunds
+	}
+
+	if accountTo.Balance > math.MaxInt64-amount {
+		return storage.ErrBalanceOverflow
 	}
 
 	accountFrom.Balance -= amount
