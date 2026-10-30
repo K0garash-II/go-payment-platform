@@ -31,7 +31,12 @@ func (s *Service) CreateAccount(owner string) account.Account {
 }
 
 func (s *Service) GetAccount(id int) (account.Account, error) {
+	if id <= 0 {
+		return account.Account{}, ErrInvalidAccountID
+	}
+	
 	acc, err := s.store.GetAccount(id)
+
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return account.Account{}, ErrAccountNotFound
 	}
@@ -45,6 +50,10 @@ func (s *Service) GetAccount(id int) (account.Account, error) {
 func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
 	if amount <= 0 {
 		return account.Account{}, ErrInvalidAmount
+	}
+
+	if id <= 0 {
+		return account.Account{}, ErrInvalidAccountID
 	}
 
 	acc, err := s.store.Deposit(id, amount)
@@ -64,6 +73,10 @@ func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
 func (s *Service) Transfer(fromID, toID int, amount int64) error {
 	if amount <= 0 {
 		return ErrInvalidAmount
+	}
+
+	if fromID <= 0 || toID <= 0 {
+		return ErrInvalidAccountID
 	}
 
 	if fromID == toID {
@@ -88,9 +101,16 @@ func (s *Service) Transfer(fromID, toID int, amount int64) error {
 }
 
 func (s *Service) GetTransactions(accountID int) ([]transaction.Transaction, error) {
+	if accountID <= 0 {
+		return nil, ErrInvalidAccountID
+	}
+
 	_, err := s.store.GetAccount(accountID)
-	if err != nil {
+	if errors.Is(err, storage.ErrAccountNotFound) {
 		return nil, ErrAccountNotFound
+	}
+	if err != nil {
+		return nil, err
 	}
 
 	accTrans := s.store.GetTransactions(accountID)

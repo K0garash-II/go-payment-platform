@@ -12,23 +12,14 @@ import (
 func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 	var input dto.CreateAccountRequest
 
-	if err := decodeJSON(w, r, &input); err != nil {
-		if errors.Is(err, ErrInvalidJSON) {
-			http.Error(w, "invalid JSON", http.StatusBadRequest)
-			return
-		}
-		if errors.Is(err, ErrBodyTooLarge) {
-			http.Error(w, "request body too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-		http.Error(w, "internal server error", http.StatusInternalServerError)
+	if !decodeRequest(w, r, &input) {
 		return
 	}
 
 	owner, err := validateOwner(input.Owner)
 	if err != nil {
 		if errors.Is(err, ErrInvalidOwner) {
-			http.Error(w, "Bad request", http.StatusBadRequest)
+			http.Error(w, "invalid account owner", http.StatusBadRequest)
 			return
 		}
 		http.Error(w, "internal server error", http.StatusInternalServerError)
@@ -47,6 +38,10 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	idInt, err := strconv.Atoi(id)
 	if err != nil {
+		http.Error(w, "invalid account ID", http.StatusBadRequest)
+		return
+	}
+	if idInt <= 0 {
 		http.Error(w, "invalid account ID", http.StatusBadRequest)
 		return
 	}

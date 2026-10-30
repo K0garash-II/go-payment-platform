@@ -8,4 +8,5 @@ var (
 	ErrInsufficientFunds = errors.New("insufficient funds")
 	ErrSameAccount       = errors.New("same account")
 	ErrBalanceOverflow   = errors.New("balance overflow")
+	ErrInvalidAccountID  = errors.New("invalid account id")
 )

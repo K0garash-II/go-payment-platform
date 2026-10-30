@@ -13,6 +13,10 @@ func (h *Handler) GetAccountTransactions(w http.ResponseWriter, r *http.Request)
 		http.Error(w, "invalid account ID", http.StatusBadRequest)
 		return
 	}
+	if idInt <= 0 {
+		http.Error(w, "invalid account ID", http.StatusBadRequest)
+		return
+	}
 
 	accTrans, err := h.service.GetTransactions(idInt)
 	if err != nil {
