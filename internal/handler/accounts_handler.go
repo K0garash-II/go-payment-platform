@@ -41,7 +41,7 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	acc, err := h.service.GetAccount(idInt)
 	if err != nil {
-		http.Error(w, "Account not found", http.StatusNotFound)
+		handleError(w, err)
 		return
 	}
 
