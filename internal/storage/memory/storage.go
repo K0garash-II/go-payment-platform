@@ -1,12 +1,13 @@
 package memory
 
 import (
-	"go-payment-platform/internal/account"
-	"go-payment-platform/internal/storage"
-	"go-payment-platform/internal/transaction"
 	"math"
 	"sync"
 	"time"
+
+	"go-payment-platform/internal/account"
+	"go-payment-platform/internal/storage"
+	"go-payment-platform/internal/transaction"
 )
 
 type Store struct {

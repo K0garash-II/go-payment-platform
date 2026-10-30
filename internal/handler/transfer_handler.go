@@ -1,13 +1,14 @@
 package handler
 
 import (
-	"go-payment-platform/internal/dto"
 	"net/http"
+
+	"go-payment-platform/internal/dto"
 )
 
 func (h *Handler) TransferAccount(w http.ResponseWriter, r *http.Request) {
 	var input dto.TransferRequest
-	
+
 	if !decodeRequest(w, r, &input) {
 		return
 	}

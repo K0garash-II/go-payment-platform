@@ -30,7 +30,11 @@ func (h *Handler) CreateAccount(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(acc)
+	err = json.NewEncoder(w).Encode(acc)
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }
 
 func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
@@ -54,5 +58,9 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(acc)
+	err = json.NewEncoder(w).Encode(acc)
+	if err != nil {
+		http.Error(w, "failed to encode response", http.StatusInternalServerError)
+		return
+	}
 }

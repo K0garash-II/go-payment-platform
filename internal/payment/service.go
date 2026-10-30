@@ -2,6 +2,7 @@ package payment
 
 import (
 	"errors"
+
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
 	"go-payment-platform/internal/transaction"
@@ -34,7 +35,7 @@ func (s *Service) GetAccount(id int) (account.Account, error) {
 	if id <= 0 {
 		return account.Account{}, ErrInvalidAccountID
 	}
-	
+
 	acc, err := s.store.GetAccount(id)
 
 	if errors.Is(err, storage.ErrAccountNotFound) {

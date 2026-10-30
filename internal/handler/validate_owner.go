@@ -7,7 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-var ErrInvalidOwner = errors.New("Bad request")
+var ErrInvalidOwner = errors.New("invalid owner")
 
 func validateOwner(owner string) (string, error) {
 	owner = strings.TrimSpace(owner)

@@ -15,8 +15,9 @@ func NewRouter(p *payment.Service, logger *slog.Logger) http.Handler {
 	h := handler.NewHandler(p, logger)
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("ok"))
+		if _, err := w.Write([]byte("ok")); err != nil {
+			logger.Error("failed to write health response", "error", err)
+		}
 	})
 
 	mux.HandleFunc("POST /accounts", h.CreateAccount)
