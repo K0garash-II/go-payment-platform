@@ -1,0 +1,7 @@
+CREATE TABLE transactions (
+    id BIGSERIAL PRIMARY KEY,
+    account_id BIGINT NOT NULL REFERENCES accounts(id) ON DELETE RESTRICT,
+    type VARCHAR(20) NOT NULL,
+    amount BIGINT NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+)
