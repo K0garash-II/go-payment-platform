@@ -23,7 +23,7 @@ type AccountStore interface {
 	GetAccount(id int) (account.Account, error)
 	Deposit(id int, amount int64) (account.Account, error)
 	Transfer(fromID, toID int, amount int64) error
-	GetTransactions(accountID int) []transaction.Transaction
+	GetTransactions(accountID, offset, limit int) []transaction.Transaction
 }
 
 func (s *Service) CreateAccount(owner string) account.Account {
@@ -101,7 +101,7 @@ func (s *Service) Transfer(fromID, toID int, amount int64) error {
 	return nil
 }
 
-func (s *Service) GetTransactions(accountID int) ([]transaction.Transaction, error) {
+func (s *Service) GetTransactions(accountID, offset, limit int) ([]transaction.Transaction, error) {
 	if accountID <= 0 {
 		return nil, ErrInvalidAccountID
 	}
@@ -114,7 +114,7 @@ func (s *Service) GetTransactions(accountID int) ([]transaction.Transaction, err
 		return nil, err
 	}
 
-	accTrans := s.store.GetTransactions(accountID)
+	accTrans := s.store.GetTransactions(accountID, offset, limit)
 
 	return accTrans, nil
 }

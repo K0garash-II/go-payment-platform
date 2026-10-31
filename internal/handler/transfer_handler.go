@@ -4,12 +4,13 @@ import (
 	"net/http"
 
 	"go-payment-platform/internal/dto"
+	"go-payment-platform/internal/validation"
 )
 
 func (h *Handler) TransferAccount(w http.ResponseWriter, r *http.Request) {
 	var input dto.TransferRequest
 
-	if !decodeRequest(w, r, &input) {
+	if !validation.DecodeRequest(w, r, &input) {
 		return
 	}
 
@@ -19,5 +20,5 @@ func (h *Handler) TransferAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
+	w.WriteHeader(http.StatusNoContent)
 }

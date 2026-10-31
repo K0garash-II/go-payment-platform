@@ -117,7 +117,7 @@ func TestPaymentAPI(t *testing.T) {
 		"/transfers", `{"from_id":1,"to_id":2,"amount":700}`,
 	)
 
-	if res.Code != http.StatusOK {
+	if res.Code != http.StatusNoContent {
 		t.Fatalf("successful transfer: got %d, want %d; body: %s",
 			res.Code, http.StatusOK, res.Body.String())
 	}

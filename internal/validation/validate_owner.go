@@ -1,15 +1,12 @@
-package handler
+package validation
 
 import (
-	"errors"
 	"strings"
 	"unicode"
 	"unicode/utf8"
 )
 
-var ErrInvalidOwner = errors.New("invalid owner")
-
-func validateOwner(owner string) (string, error) {
+func ValidateOwner(owner string) (string, error) {
 	owner = strings.TrimSpace(owner)
 	if owner == "" {
 		return "", ErrInvalidOwner

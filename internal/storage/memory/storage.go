@@ -125,7 +125,7 @@ func (s *Store) Transfer(fromID, toID int, amount int64) error {
 	return nil
 }
 
-func (s *Store) GetTransactions(accountID int) []transaction.Transaction {
+func (s *Store) GetTransactions(accountID, offset, limit int) []transaction.Transaction {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -137,7 +137,18 @@ func (s *Store) GetTransactions(accountID int) []transaction.Transaction {
 		}
 	}
 
-	return accTransactions
+	if offset >= len(accTransactions) {
+		return []transaction.Transaction{}
+	}
+
+	end := offset + limit
+	if end > len(accTransactions) {
+		end = len(accTransactions)
+	}
+
+	accTransactionsPag := accTransactions[offset:end]
+
+	return accTransactionsPag
 }
 
 func NewStore() *Store {

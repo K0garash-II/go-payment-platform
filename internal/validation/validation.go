@@ -1,4 +1,4 @@
-package handler
+package validation
 
 import (
 	"encoding/json"
@@ -7,12 +7,7 @@ import (
 	"net/http"
 )
 
-var (
-	ErrInvalidJSON  = errors.New("invalid JSON")
-	ErrBodyTooLarge = errors.New("request body too large")
-)
-
-func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
+func DecodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 	decoder := json.NewDecoder(r.Body)
 	decoder.DisallowUnknownFields()
@@ -33,8 +28,8 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 	return nil
 }
 
-func decodeRequest(w http.ResponseWriter, r *http.Request, dst any) bool {
-	err := decodeJSON(w, r, dst)
+func DecodeRequest(w http.ResponseWriter, r *http.Request, dst any) bool {
+	err := DecodeJSON(w, r, dst)
 	if err == nil {
 		return true
 	}
