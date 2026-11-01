@@ -18,10 +18,18 @@ import (
 	"go-payment-platform/internal/payment"
 	"go-payment-platform/internal/storage/postgres"
 
+	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 )
 
-func setupTestServer(t *testing.T) http.Handler {
+type testEnv struct {
+	server     http.Handler
+	store      *postgres.Store
+	cleanupDB  *pgxpool.Pool
+	accountIDs []int64
+}
+
+func setupTestServer(t *testing.T) *testEnv {
 	t.Helper()
 
 	if err := godotenv.Load("../../.env"); err != nil {
@@ -55,192 +63,232 @@ func setupTestServer(t *testing.T) http.Handler {
 		t.Fatalf("connect to test database: %v", err)
 	}
 
-	t.Cleanup(store.Close)
+	cleanupDB, err := pgxpool.New(ctx, connString)
+	if err != nil {
+		store.Close()
+		t.Fatalf("connect cleanup database: %v", err)
+	}
+
+	if err := cleanupDB.Ping(ctx); err != nil {
+		cleanupDB.Close()
+		store.Close()
+		t.Fatalf("ping cleanup database: %v", err)
+	}
+
+	env := &testEnv{
+		store:     store,
+		cleanupDB: cleanupDB,
+	}
+
+	t.Cleanup(func() {
+		cleanupCtx, cancel := context.WithTimeout(
+			context.Background(),
+			5*time.Second,
+		)
+		defer cancel()
+
+		if len(env.accountIDs) > 0 {
+			_, err := env.cleanupDB.Exec(
+				cleanupCtx,
+				`DELETE FROM transactions
+             WHERE account_id = ANY($1::bigint[])`,
+				env.accountIDs,
+			)
+			if err != nil {
+				t.Errorf("cleanup transactions: %v", err)
+			}
+
+			_, err = env.cleanupDB.Exec(
+				cleanupCtx,
+				`DELETE FROM accounts
+             WHERE id = ANY($1::bigint[])`,
+				env.accountIDs,
+			)
+			if err != nil {
+				t.Errorf("cleanup accounts: %v", err)
+			}
+		}
+
+		env.cleanupDB.Close()
+		env.store.Close()
+	})
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	service := payment.NewService(store)
 
-	return NewRouter(service, logger)
+	env.server = NewRouter(service, logger)
+
+	return env
 }
 
-func TestCreateAccount(t *testing.T) {
-	server := setupTestServer(t)
+func (env *testEnv) createAccount(t *testing.T, owner string) int {
+	t.Helper()
 
-	body := bytes.NewBufferString(`{"owner":"Test User"}`)
-	req := httptest.NewRequest(http.MethodPost, "/accounts", body)
+	body := bytes.NewBufferString(
+		fmt.Sprintf(`{"owner":%q}`, owner),
+	)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/accounts",
+		body,
+	)
+
 	rec := httptest.NewRecorder()
-
-	server.ServeHTTP(rec, req)
+	env.server.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
-		t.Fatalf("expected status %d, got %d; body: %s",
-			http.StatusCreated, rec.Code, rec.Body.String())
+		t.Fatalf(
+			"create account: expected status %d, got %d; body: %s",
+			http.StatusCreated,
+			rec.Code,
+			rec.Body.String(),
+		)
 	}
 
-	var response map[string]any
+	var response struct {
+		ID int `json:"id"`
+	}
+
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode response: %v", err)
-	}
-
-	if response["owner"] != "Test User" {
-		t.Fatalf("expected owner %q, got %v", "Test User", response["owner"])
-	}
-}
-
-func TestGetAccount(t *testing.T) {
-	server := setupTestServer(t)
-
-	// Сначала создаём аккаунт.
-	createBody := bytes.NewBufferString(`{"owner":"Get Test User"}`)
-	createReq := httptest.NewRequest(http.MethodPost, "/accounts", createBody)
-	createRec := httptest.NewRecorder()
-	server.ServeHTTP(createRec, createReq)
-
-	if createRec.Code != http.StatusCreated {
-		t.Fatalf("create account: expected status %d, got %d; body: %s",
-			http.StatusCreated, createRec.Code, createRec.Body.String())
-	}
-
-	var account map[string]any
-	if err := json.Unmarshal(createRec.Body.Bytes(), &account); err != nil {
 		t.Fatalf("decode created account: %v", err)
 	}
 
-	id, ok := account["id"].(float64)
-	if !ok || id <= 0 {
-		t.Fatalf("invalid account id: %v", account["id"])
+	if response.ID <= 0 {
+		t.Fatalf("invalid account ID: %d", response.ID)
 	}
 
-	// Затем получаем его по ID.
+	env.accountIDs = append(env.accountIDs, int64(response.ID))
+
+	return response.ID
+}
+
+func TestCreateAccount(t *testing.T) {
+	env := setupTestServer(t)
+
+	env.createAccount(t, "Test User")
+}
+
+func TestGetAccount(t *testing.T) {
+	env := setupTestServer(t)
+
+	id := env.createAccount(t, "Get Test User")
+
 	req := httptest.NewRequest(
 		http.MethodGet,
-		fmt.Sprintf("/accounts/%.0f", id),
+		fmt.Sprintf("/accounts/%d", id),
 		nil,
 	)
-	rec := httptest.NewRecorder()
 
-	server.ServeHTTP(rec, req)
+	rec := httptest.NewRecorder()
+	env.server.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d; body: %s",
-			http.StatusOK, rec.Code, rec.Body.String())
+		t.Fatalf(
+			"expected status %d, got %d; body: %s",
+			http.StatusOK,
+			rec.Code,
+			rec.Body.String(),
+		)
 	}
 }
 
 func TestDeposit(t *testing.T) {
-	server := setupTestServer(t)
+	env := setupTestServer(t)
 
-	createBody := bytes.NewBufferString(`{"owner":"Deposit Test User"}`)
-	createReq := httptest.NewRequest(http.MethodPost, "/accounts", createBody)
-	createRec := httptest.NewRecorder()
-	server.ServeHTTP(createRec, createReq)
+	id := env.createAccount(t, "Deposit Test User")
 
-	if createRec.Code != http.StatusCreated {
-		t.Fatalf("create account: %s", createRec.Body.String())
-	}
-
-	var account map[string]any
-	if err := json.Unmarshal(createRec.Body.Bytes(), &account); err != nil {
-		t.Fatal(err)
-	}
-
-	id := int(account["id"].(float64))
-
-	depositBody := bytes.NewBufferString(fmt.Sprintf(
+	body := bytes.NewBufferString(fmt.Sprintf(
 		`{"account_id":%d,"amount":10000}`,
 		id,
 	))
-	req := httptest.NewRequest(http.MethodPost, "/deposits", depositBody)
-	rec := httptest.NewRecorder()
 
-	server.ServeHTTP(rec, req)
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/deposits",
+		body,
+	)
+
+	rec := httptest.NewRecorder()
+	env.server.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d; body: %s",
-			http.StatusOK, rec.Code, rec.Body.String())
+		t.Fatalf(
+			"expected status %d, got %d; body: %s",
+			http.StatusOK,
+			rec.Code,
+			rec.Body.String(),
+		)
 	}
 }
 
 func TestTransfer(t *testing.T) {
-	server := setupTestServer(t)
+	env := setupTestServer(t)
 
-	createAccount := func(owner string) int {
-		body := bytes.NewBufferString(fmt.Sprintf(`{"owner":%q}`, owner))
-		req := httptest.NewRequest(http.MethodPost, "/accounts", body)
-		rec := httptest.NewRecorder()
+	fromID := env.createAccount(t, "Transfer Sender")
+	toID := env.createAccount(t, "Transfer Receiver")
 
-		server.ServeHTTP(rec, req)
-
-		if rec.Code != http.StatusCreated {
-			t.Fatalf("create account: %s", rec.Body.String())
-		}
-
-		var account map[string]any
-		if err := json.Unmarshal(rec.Body.Bytes(), &account); err != nil {
-			t.Fatal(err)
-		}
-
-		return int(account["id"].(float64))
-	}
-
-	fromID := createAccount("Transfer Sender")
-	toID := createAccount("Transfer Receiver")
-
-	// Пополняем счёт отправителя.
 	depositBody := bytes.NewBufferString(fmt.Sprintf(
 		`{"account_id":%d,"amount":20000}`,
 		fromID,
 	))
-	depositReq := httptest.NewRequest(http.MethodPost, "/deposits", depositBody)
+
+	depositReq := httptest.NewRequest(
+		http.MethodPost,
+		"/deposits",
+		depositBody,
+	)
+
 	depositRec := httptest.NewRecorder()
-	server.ServeHTTP(depositRec, depositReq)
+	env.server.ServeHTTP(depositRec, depositReq)
 
 	if depositRec.Code != http.StatusOK {
 		t.Fatalf("deposit: %s", depositRec.Body.String())
 	}
 
-	// Переводим часть средств получателю.
 	transferBody := bytes.NewBufferString(fmt.Sprintf(
 		`{"from_id":%d,"to_id":%d,"amount":5000}`,
 		fromID,
 		toID,
 	))
-	req := httptest.NewRequest(http.MethodPost, "/transfers", transferBody)
+
+	req := httptest.NewRequest(
+		http.MethodPost,
+		"/transfers",
+		transferBody,
+	)
+
 	rec := httptest.NewRecorder()
-	server.ServeHTTP(rec, req)
+	env.server.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNoContent {
-		t.Fatalf("expected status %d, got %d; body: %s",
-			http.StatusNoContent, rec.Code, rec.Body.String())
+		t.Fatalf(
+			"expected status %d, got %d; body: %s",
+			http.StatusNoContent,
+			rec.Code,
+			rec.Body.String(),
+		)
 	}
 }
 
 func TestGetTransactions(t *testing.T) {
-	server := setupTestServer(t)
+	env := setupTestServer(t)
 
-	createBody := bytes.NewBufferString(`{"owner":"Transactions Test User"}`)
-	createReq := httptest.NewRequest(http.MethodPost, "/accounts", createBody)
-	createRec := httptest.NewRecorder()
-	server.ServeHTTP(createRec, createReq)
-
-	if createRec.Code != http.StatusCreated {
-		t.Fatalf("create account: %s", createRec.Body.String())
-	}
-
-	var account map[string]any
-	if err := json.Unmarshal(createRec.Body.Bytes(), &account); err != nil {
-		t.Fatal(err)
-	}
-
-	id := int(account["id"].(float64))
+	id := env.createAccount(t, "Transactions Test User")
 
 	depositBody := bytes.NewBufferString(fmt.Sprintf(
 		`{"account_id":%d,"amount":10000}`,
 		id,
 	))
-	depositReq := httptest.NewRequest(http.MethodPost, "/deposits", depositBody)
+
+	depositReq := httptest.NewRequest(
+		http.MethodPost,
+		"/deposits",
+		depositBody,
+	)
+
 	depositRec := httptest.NewRecorder()
-	server.ServeHTTP(depositRec, depositReq)
+	env.server.ServeHTTP(depositRec, depositReq)
 
 	if depositRec.Code != http.StatusOK {
 		t.Fatalf("deposit: %s", depositRec.Body.String())
@@ -248,14 +296,22 @@ func TestGetTransactions(t *testing.T) {
 
 	req := httptest.NewRequest(
 		http.MethodGet,
-		fmt.Sprintf("/accounts/%d/transactions?offset=0&limit=10", id),
+		fmt.Sprintf(
+			"/accounts/%d/transactions?offset=0&limit=10",
+			id,
+		),
 		nil,
 	)
+
 	rec := httptest.NewRecorder()
-	server.ServeHTTP(rec, req)
+	env.server.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
-		t.Fatalf("expected status %d, got %d; body: %s",
-			http.StatusOK, rec.Code, rec.Body.String())
+		t.Fatalf(
+			"expected status %d, got %d; body: %s",
+			http.StatusOK,
+			rec.Code,
+			rec.Body.String(),
+		)
 	}
 }
