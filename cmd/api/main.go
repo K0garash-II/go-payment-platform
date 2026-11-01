@@ -39,7 +39,7 @@ func main() {
 	}
 
 	defer store.Close()
-	
+
 	p := payment.NewService(store)
 	router := httpapi.NewRouter(p, logger)
 

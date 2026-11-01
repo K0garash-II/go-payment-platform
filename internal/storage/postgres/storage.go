@@ -2,14 +2,13 @@ package postgres
 
 import (
 	"context"
-	"errors"
 	"fmt"
+	"math"
+
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
 	"go-payment-platform/internal/transaction"
-	"math"
 
-	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -18,37 +17,19 @@ type Store struct {
 }
 
 func (s *Store) CreateAccount(ctx context.Context, owner string) (account.Account, error) {
-	var acc account.Account
-	err := s.pool.QueryRow(
+	return scanAccount(s.pool.QueryRow(
 		ctx,
 		"INSERT INTO accounts (owner) VALUES ($1) RETURNING id, owner, balance",
 		owner,
-	).Scan(&acc.ID, &acc.Owner, &acc.Balance)
-
-	if err != nil {
-		return account.Account{}, err
-	}
-
-	return acc, nil
+	))
 }
 
 func (s *Store) GetAccount(ctx context.Context, id int) (account.Account, error) {
-	var acc account.Account
-	err := s.pool.QueryRow(
+	return scanAccount(s.pool.QueryRow(
 		ctx,
 		"SELECT id, owner, balance FROM accounts WHERE id = $1",
 		id,
-	).Scan(&acc.ID, &acc.Owner, &acc.Balance)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return account.Account{}, storage.ErrAccountNotFound
-	}
-
-	if err != nil {
-		return account.Account{}, err
-	}
-
-	return acc, nil
+	))
 }
 
 func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Account, error) {
@@ -58,28 +39,16 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Acco
 	}
 	defer tx.Rollback(ctx)
 
-	var acc account.Account
-	err = tx.QueryRow(
+	acc, err := scanAccount(tx.QueryRow(
 		ctx,
 		"UPDATE accounts SET balance = balance + $1 WHERE id = $2 RETURNING id, owner, balance",
 		amount, id,
-	).Scan(&acc.ID, &acc.Owner, &acc.Balance)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return account.Account{}, storage.ErrAccountNotFound
-	}
-
+	))
 	if err != nil {
 		return account.Account{}, err
 	}
 
-	_, err = tx.Exec(
-		ctx,
-		"INSERT INTO transactions (account_id, type, amount) VALUES ($1, $2, $3)",
-		acc.ID, "deposit", amount,
-	)
-
-	if err != nil {
+	if err := insertTransaction(ctx, tx, acc.ID, "deposit", amount); err != nil {
 		return account.Account{}, err
 	}
 
@@ -105,30 +74,20 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 		firstID, secondID = toID, fromID
 	}
 
-	var first, second account.Account
-
-	err = tx.QueryRow(
+	first, err := scanAccount(tx.QueryRow(
 		ctx,
 		"SELECT id, owner, balance FROM accounts WHERE id = $1 FOR UPDATE",
 		firstID,
-	).Scan(&first.ID, &first.Owner, &first.Balance)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return storage.ErrAccountNotFound
-	}
+	))
 	if err != nil {
 		return err
 	}
 
-	err = tx.QueryRow(
+	second, err := scanAccount(tx.QueryRow(
 		ctx,
 		"SELECT id, owner, balance FROM accounts WHERE id = $1 FOR UPDATE",
 		secondID,
-	).Scan(&second.ID, &second.Owner, &second.Balance)
-
-	if errors.Is(err, pgx.ErrNoRows) {
-		return storage.ErrAccountNotFound
-	}
+	))
 	if err != nil {
 		return err
 	}
@@ -165,21 +124,11 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 		return storage.ErrBalanceOverflow
 	}
 
-	_, err = tx.Exec(
-		ctx,
-		"INSERT INTO transactions (account_id, type, amount) VALUES ($1, $2, $3)",
-		accFrom.ID, "transfer_out", amount,
-	)
-	if err != nil {
+	if err := insertTransaction(ctx, tx, accFrom.ID, "transfer_out", amount); err != nil {
 		return err
 	}
 
-	_, err = tx.Exec(
-		ctx,
-		"INSERT INTO transactions (account_id, type, amount) VALUES ($1, $2, $3)",
-		accTo.ID, "transfer_in", amount,
-	)
-	if err != nil {
+	if err := insertTransaction(ctx, tx, accTo.ID, "transfer_in", amount); err != nil {
 		return err
 	}
 
