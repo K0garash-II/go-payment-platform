@@ -10,4 +10,5 @@ var (
 	ErrBalanceOverflow    = errors.New("balance overflow")
 	ErrInvalidAccountID   = errors.New("invalid account id")
 	ErrEmailAlreadyExists = errors.New("email already exists")
+	ErrUserNotFound       = errors.New("user not found")
 )

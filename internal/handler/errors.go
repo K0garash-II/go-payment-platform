@@ -37,6 +37,9 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, payment.ErrEmailAlreadyExists):
 		http.Error(w, err.Error(), http.StatusConflict)
 
+	case errors.Is(err, payment.ErrUserNotFound):
+		http.Error(w, err.Error(), http.StatusNotFound)
+
 	default:
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}

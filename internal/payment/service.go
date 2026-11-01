@@ -22,6 +22,7 @@ func NewService(store AccountStore) *Service {
 
 type AccountStore interface {
 	RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error)
+	GetUserByEmail(ctx context.Context, email string) (user.User, error)
 	GetAccount(ctx context.Context, id int) (account.Account, error)
 	Deposit(ctx context.Context, id int, amount int64) (account.Account, error)
 	Transfer(ctx context.Context, fromID, toID int, amount int64) error
@@ -39,6 +40,19 @@ func (s *Service) RegisterUser(ctx context.Context, email string, passwordHash s
 	}
 
 	return u, acc, nil
+}
+
+func (s *Service) GetUserByEmail(ctx context.Context, email string) (user.User, error) {
+	u, err := s.store.GetUserByEmail(ctx, email)
+	if errors.Is(err, storage.ErrUserNotFound) {
+		return user.User{}, ErrUserNotFound
+	}
+	
+	if err != nil {
+		return user.User{}, err
+	}
+
+	return u, nil
 }
 
 func (s *Service) GetAccount(ctx context.Context, id int) (account.Account, error) {
