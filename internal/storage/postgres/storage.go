@@ -154,7 +154,7 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 
 	tag, err := tx.Exec(
 		ctx,
-		`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND balance <= $3 - $1`,
+		`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND balance <= $3::bigint - $1::bigint`,
 		amount, accTo.ID, int64(math.MaxInt64),
 	)
 	if err != nil {

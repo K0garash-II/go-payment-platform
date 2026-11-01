@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"errors"
+	"log"
 	"net/http"
 
 	"go-payment-platform/internal/payment"
@@ -15,7 +16,7 @@ func handleError(w http.ResponseWriter, err error) {
 
 	case errors.Is(err, context.Canceled):
 		return
-		
+
 	case errors.Is(err, payment.ErrInvalidAmount):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
@@ -35,6 +36,7 @@ func handleError(w http.ResponseWriter, err error) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
 	default:
+		log.Printf("unhandled error: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

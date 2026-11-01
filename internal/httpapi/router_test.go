@@ -9,6 +9,8 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,16 +23,19 @@ import (
 
 func setupTestServer(t *testing.T) http.Handler {
 	t.Helper()
-	
-	err := godotenv.Load("../../.env")
-	if err != nil {
+
+	if err := godotenv.Load("../../.env"); err != nil {
 		t.Fatalf("load .env: %v", err)
 	}
-
 
 	cfg, err := config.LoadConfig()
 	if err != nil {
 		t.Fatalf("load config: %v", err)
+	}
+
+	testDBName := strings.TrimSpace(os.Getenv("TEST_DB_NAME"))
+	if testDBName != "payment_platform_test" {
+		t.Fatalf("unsafe test database name: %q", testDBName)
 	}
 
 	connString := fmt.Sprintf(
@@ -39,7 +44,7 @@ func setupTestServer(t *testing.T) http.Handler {
 		cfg.DBPassword,
 		cfg.DBHost,
 		cfg.DBPort,
-		cfg.DBName,
+		testDBName,
 	)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -47,7 +52,7 @@ func setupTestServer(t *testing.T) http.Handler {
 
 	store, err := postgres.NewStore(ctx, connString)
 	if err != nil {
-		t.Fatalf("connect to database: %v", err)
+		t.Fatalf("connect to test database: %v", err)
 	}
 
 	t.Cleanup(store.Close)
@@ -204,9 +209,9 @@ func TestTransfer(t *testing.T) {
 	rec := httptest.NewRecorder()
 	server.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
+	if rec.Code != http.StatusNoContent {
 		t.Fatalf("expected status %d, got %d; body: %s",
-			http.StatusOK, rec.Code, rec.Body.String())
+			http.StatusNoContent, rec.Code, rec.Body.String())
 	}
 }
 
