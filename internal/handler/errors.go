@@ -3,7 +3,6 @@ package handler
 import (
 	"context"
 	"errors"
-	"log"
 	"net/http"
 
 	"go-payment-platform/internal/payment"
@@ -35,8 +34,10 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, payment.ErrInvalidAccountID):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
+	case errors.Is(err, payment.ErrEmailAlreadyExists):
+		http.Error(w, err.Error(), http.StatusConflict)
+
 	default:
-		log.Printf("unhandled error: %v", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
 }

@@ -27,6 +27,7 @@ type testEnv struct {
 	store      *postgres.Store
 	cleanupDB  *pgxpool.Pool
 	accountIDs []int64
+	userIDs    []int64
 }
 
 func setupTestServer(t *testing.T) *testEnv {
@@ -91,7 +92,7 @@ func setupTestServer(t *testing.T) *testEnv {
 			_, err := env.cleanupDB.Exec(
 				cleanupCtx,
 				`DELETE FROM transactions
-             WHERE account_id = ANY($1::bigint[])`,
+				 WHERE account_id = ANY($1::bigint[])`,
 				env.accountIDs,
 			)
 			if err != nil {
@@ -101,11 +102,23 @@ func setupTestServer(t *testing.T) *testEnv {
 			_, err = env.cleanupDB.Exec(
 				cleanupCtx,
 				`DELETE FROM accounts
-             WHERE id = ANY($1::bigint[])`,
+				 WHERE id = ANY($1::bigint[])`,
 				env.accountIDs,
 			)
 			if err != nil {
 				t.Errorf("cleanup accounts: %v", err)
+			}
+		}
+
+		if len(env.userIDs) > 0 {
+			_, err := env.cleanupDB.Exec(
+				cleanupCtx,
+				`DELETE FROM users
+				 WHERE id = ANY($1::bigint[])`,
+				env.userIDs,
+			)
+			if err != nil {
+				t.Errorf("cleanup users: %v", err)
 			}
 		}
 
@@ -121,16 +134,19 @@ func setupTestServer(t *testing.T) *testEnv {
 	return env
 }
 
-func (env *testEnv) createAccount(t *testing.T, owner string) int {
+func (env *testEnv) registerUser(t *testing.T, email string) int {
 	t.Helper()
 
 	body := bytes.NewBufferString(
-		fmt.Sprintf(`{"owner":%q}`, owner),
+		fmt.Sprintf(
+			`{"email":%q,"password":"testpassword123"}`,
+			email,
+		),
 	)
 
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/accounts",
+		"/register",
 		body,
 	)
 
@@ -139,7 +155,7 @@ func (env *testEnv) createAccount(t *testing.T, owner string) int {
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf(
-			"create account: expected status %d, got %d; body: %s",
+			"register user: expected status %d, got %d; body: %s",
 			http.StatusCreated,
 			rec.Code,
 			rec.Body.String(),
@@ -147,32 +163,43 @@ func (env *testEnv) createAccount(t *testing.T, owner string) int {
 	}
 
 	var response struct {
-		ID int `json:"id"`
+		User struct {
+			ID int `json:"id"`
+		} `json:"user"`
+
+		Account struct {
+			ID int `json:"id"`
+		} `json:"account"`
 	}
 
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
-		t.Fatalf("decode created account: %v", err)
+		t.Fatalf("decode registration response: %v", err)
 	}
 
-	if response.ID <= 0 {
-		t.Fatalf("invalid account ID: %d", response.ID)
+	if response.User.ID <= 0 {
+		t.Fatalf("invalid user ID: %d", response.User.ID)
 	}
 
-	env.accountIDs = append(env.accountIDs, int64(response.ID))
+	if response.Account.ID <= 0 {
+		t.Fatalf("invalid account ID: %d", response.Account.ID)
+	}
 
-	return response.ID
+	env.userIDs = append(env.userIDs, int64(response.User.ID))
+	env.accountIDs = append(env.accountIDs, int64(response.Account.ID))
+
+	return response.Account.ID
 }
 
-func TestCreateAccount(t *testing.T) {
+func TestRegisterUser(t *testing.T) {
 	env := setupTestServer(t)
 
-	env.createAccount(t, "Test User")
+	env.registerUser(t, "register@example.com")
 }
 
 func TestGetAccount(t *testing.T) {
 	env := setupTestServer(t)
 
-	id := env.createAccount(t, "Get Test User")
+	id := env.registerUser(t, "get@example.com")
 
 	req := httptest.NewRequest(
 		http.MethodGet,
@@ -196,7 +223,7 @@ func TestGetAccount(t *testing.T) {
 func TestDeposit(t *testing.T) {
 	env := setupTestServer(t)
 
-	id := env.createAccount(t, "Deposit Test User")
+	id := env.registerUser(t, "deposit@example.com")
 
 	body := bytes.NewBufferString(fmt.Sprintf(
 		`{"account_id":%d,"amount":10000}`,
@@ -225,8 +252,8 @@ func TestDeposit(t *testing.T) {
 func TestTransfer(t *testing.T) {
 	env := setupTestServer(t)
 
-	fromID := env.createAccount(t, "Transfer Sender")
-	toID := env.createAccount(t, "Transfer Receiver")
+	fromID := env.registerUser(t, "sender@example.com")
+	toID := env.registerUser(t, "receiver@example.com")
 
 	depositBody := bytes.NewBufferString(fmt.Sprintf(
 		`{"account_id":%d,"amount":20000}`,
@@ -274,7 +301,7 @@ func TestTransfer(t *testing.T) {
 func TestGetTransactions(t *testing.T) {
 	env := setupTestServer(t)
 
-	id := env.createAccount(t, "Transactions Test User")
+	id := env.registerUser(t, "transactions@example.com")
 
 	depositBody := bytes.NewBufferString(fmt.Sprintf(
 		`{"account_id":%d,"amount":10000}`,

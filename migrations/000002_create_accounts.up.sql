@@ -1,5 +1,5 @@
 CREATE TABLE accounts (
     id BIGSERIAL PRIMARY KEY,
-    owner VARCHAR(50) NOT NULL,
+    user_id BIGINT NOT NULL UNIQUE REFERENCES users(id) ON DELETE RESTRICT,
     balance BIGINT NOT NULL DEFAULT 0 CHECK (balance >= 0)
 );

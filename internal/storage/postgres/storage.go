@@ -2,13 +2,16 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
 	"go-payment-platform/internal/transaction"
+	"go-payment-platform/internal/user"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -16,18 +19,59 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-func (s *Store) CreateAccount(ctx context.Context, owner string) (account.Account, error) {
-	return scanAccount(s.pool.QueryRow(
+func (s *Store) RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return user.User{}, account.Account{}, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var pgErr *pgconn.PgError
+
+	var u user.User
+
+	err = tx.QueryRow(
 		ctx,
-		"INSERT INTO accounts (owner) VALUES ($1) RETURNING id, owner, balance",
-		owner,
-	))
+		`INSERT INTO users (email, password_hash)
+         VALUES ($1, $2)
+         RETURNING id, email, password_hash, created_at`,
+		email,
+		passwordHash,
+	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt)
+
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+		return user.User{}, account.Account{}, storage.ErrEmailAlreadyExists
+	}
+
+	if err != nil {
+		return user.User{}, account.Account{}, err
+	}
+
+	var acc account.Account
+
+	err = tx.QueryRow(
+		ctx,
+		"INSERT INTO accounts (user_id) VALUES ($1) RETURNING id, user_id, balance",
+		u.ID,
+	).Scan(&acc.ID, &acc.UserID, &acc.Balance)
+
+	if err != nil {
+		return user.User{}, account.Account{}, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return user.User{}, account.Account{}, err
+	}
+
+	return u, acc, nil
 }
 
 func (s *Store) GetAccount(ctx context.Context, id int) (account.Account, error) {
 	return scanAccount(s.pool.QueryRow(
 		ctx,
-		"SELECT id, owner, balance FROM accounts WHERE id = $1",
+		"SELECT id, user_id, balance FROM accounts WHERE id = $1",
 		id,
 	))
 }
@@ -37,13 +81,41 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Acco
 	if err != nil {
 		return account.Account{}, err
 	}
-	defer tx.Rollback(ctx)
+
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	acc, err := scanAccount(tx.QueryRow(
 		ctx,
-		"UPDATE accounts SET balance = balance + $1 WHERE id = $2 RETURNING id, owner, balance",
+		`UPDATE accounts
+		 SET balance = balance + $1
+		 WHERE id = $2
+		 AND balance <= 9223372036854775807 - $1
+		 RETURNING id, user_id, balance`,
 		amount, id,
 	))
+
+	if errors.Is(err, storage.ErrAccountNotFound) {
+		var exists bool
+
+		err = tx.QueryRow(
+			ctx,
+			"SELECT EXISTS(SELECT 1 FROM accounts WHERE id = $1)",
+			id,
+		).Scan(&exists)
+
+		if err != nil {
+			return account.Account{}, err
+		}
+
+		if !exists {
+			return account.Account{}, storage.ErrAccountNotFound
+		}
+
+		return account.Account{}, storage.ErrBalanceOverflow
+	}
+
 	if err != nil {
 		return account.Account{}, err
 	}
@@ -64,7 +136,9 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback(ctx)
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
 
 	var accFrom, accTo account.Account
 
@@ -76,7 +150,7 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 
 	first, err := scanAccount(tx.QueryRow(
 		ctx,
-		"SELECT id, owner, balance FROM accounts WHERE id = $1 FOR UPDATE",
+		"SELECT id, user_id, balance FROM accounts WHERE id = $1 FOR UPDATE",
 		firstID,
 	))
 	if err != nil {
@@ -85,7 +159,7 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 
 	second, err := scanAccount(tx.QueryRow(
 		ctx,
-		"SELECT id, owner, balance FROM accounts WHERE id = $1 FOR UPDATE",
+		"SELECT id, user_id, balance FROM accounts WHERE id = $1 FOR UPDATE",
 		secondID,
 	))
 	if err != nil {

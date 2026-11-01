@@ -15,7 +15,7 @@ func scanAccount(row pgx.Row) (account.Account, error) {
 
 	err := row.Scan(
 		&acc.ID,
-		&acc.Owner,
+		&acc.UserID,
 		&acc.Balance,
 	)
 

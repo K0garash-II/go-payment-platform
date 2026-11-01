@@ -20,7 +20,7 @@ func NewRouter(p *payment.Service, logger *slog.Logger) http.Handler {
 		}
 	})
 
-	mux.HandleFunc("POST /accounts", h.CreateAccount)
+	mux.HandleFunc("POST /register", h.RegisterUser)
 	mux.HandleFunc("GET /accounts/{id}", h.GetAccount)
 	mux.HandleFunc("POST /deposits", h.DepositAccount)
 	mux.HandleFunc("POST /transfers", h.TransferAccount)

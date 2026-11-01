@@ -7,6 +7,7 @@ import (
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
 	"go-payment-platform/internal/transaction"
+	"go-payment-platform/internal/user"
 )
 
 type Service struct {
@@ -20,20 +21,24 @@ func NewService(store AccountStore) *Service {
 }
 
 type AccountStore interface {
-	CreateAccount(ctx context.Context, owner string) (account.Account, error)
+	RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error)
 	GetAccount(ctx context.Context, id int) (account.Account, error)
 	Deposit(ctx context.Context, id int, amount int64) (account.Account, error)
 	Transfer(ctx context.Context, fromID, toID int, amount int64) error
 	GetTransactions(ctx context.Context, accountID, offset, limit int) ([]transaction.Transaction, error)
 }
 
-func (s *Service) CreateAccount(ctx context.Context, owner string) (account.Account, error) {
-	acc, err := s.store.CreateAccount(ctx, owner)
+func (s *Service) RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error) {
+	u, acc, err := s.store.RegisterUser(ctx, email, passwordHash)
+
+	if errors.Is(err, storage.ErrEmailAlreadyExists) {
+		return user.User{}, account.Account{}, ErrEmailAlreadyExists
+	}
 	if err != nil {
-		return account.Account{}, err
+		return user.User{}, account.Account{}, err
 	}
 
-	return acc, nil
+	return u, acc, nil
 }
 
 func (s *Service) GetAccount(ctx context.Context, id int) (account.Account, error) {

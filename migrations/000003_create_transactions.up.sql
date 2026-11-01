@@ -4,4 +4,4 @@ CREATE TABLE transactions (
     type VARCHAR(20) NOT NULL,
     amount BIGINT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-)
+);
