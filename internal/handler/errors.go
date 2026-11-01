@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 
@@ -9,6 +10,12 @@ import (
 
 func handleError(w http.ResponseWriter, err error) {
 	switch {
+	case errors.Is(err, context.DeadlineExceeded):
+		http.Error(w, "request timeout", http.StatusGatewayTimeout)
+
+	case errors.Is(err, context.Canceled):
+		return
+		
 	case errors.Is(err, payment.ErrInvalidAmount):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 

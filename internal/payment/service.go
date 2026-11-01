@@ -1,6 +1,7 @@
 package payment
 
 import (
+	"context"
 	"errors"
 
 	"go-payment-platform/internal/account"
@@ -19,24 +20,28 @@ func NewService(store AccountStore) *Service {
 }
 
 type AccountStore interface {
-	CreateAccount(owner string) account.Account
-	GetAccount(id int) (account.Account, error)
-	Deposit(id int, amount int64) (account.Account, error)
-	Transfer(fromID, toID int, amount int64) error
-	GetTransactions(accountID, offset, limit int) []transaction.Transaction
+	CreateAccount(ctx context.Context, owner string) (account.Account, error)
+	GetAccount(ctx context.Context, id int) (account.Account, error)
+	Deposit(ctx context.Context, id int, amount int64) (account.Account, error)
+	Transfer(ctx context.Context, fromID, toID int, amount int64) error
+	GetTransactions(ctx context.Context, accountID, offset, limit int) ([]transaction.Transaction, error)
 }
 
-func (s *Service) CreateAccount(owner string) account.Account {
-	acc := s.store.CreateAccount(owner)
-	return acc
+func (s *Service) CreateAccount(ctx context.Context, owner string) (account.Account, error) {
+	acc, err := s.store.CreateAccount(ctx, owner)
+	if err != nil {
+		return account.Account{}, err
+	}
+
+	return acc, nil
 }
 
-func (s *Service) GetAccount(id int) (account.Account, error) {
+func (s *Service) GetAccount(ctx context.Context, id int) (account.Account, error) {
 	if id <= 0 {
 		return account.Account{}, ErrInvalidAccountID
 	}
 
-	acc, err := s.store.GetAccount(id)
+	acc, err := s.store.GetAccount(ctx, id)
 
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return account.Account{}, ErrAccountNotFound
@@ -48,7 +53,7 @@ func (s *Service) GetAccount(id int) (account.Account, error) {
 	return acc, nil
 }
 
-func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
+func (s *Service) Deposit(ctx context.Context, id int, amount int64) (account.Account, error) {
 	if amount <= 0 {
 		return account.Account{}, ErrInvalidAmount
 	}
@@ -57,7 +62,7 @@ func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
 		return account.Account{}, ErrInvalidAccountID
 	}
 
-	acc, err := s.store.Deposit(id, amount)
+	acc, err := s.store.Deposit(ctx, id, amount)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return account.Account{}, ErrAccountNotFound
 	}
@@ -71,7 +76,7 @@ func (s *Service) Deposit(id int, amount int64) (account.Account, error) {
 	return acc, nil
 }
 
-func (s *Service) Transfer(fromID, toID int, amount int64) error {
+func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64) error {
 	if amount <= 0 {
 		return ErrInvalidAmount
 	}
@@ -84,7 +89,7 @@ func (s *Service) Transfer(fromID, toID int, amount int64) error {
 		return ErrSameAccount
 	}
 
-	err := s.store.Transfer(fromID, toID, amount)
+	err := s.store.Transfer(ctx, fromID, toID, amount)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return ErrAccountNotFound
 	}
@@ -101,12 +106,12 @@ func (s *Service) Transfer(fromID, toID int, amount int64) error {
 	return nil
 }
 
-func (s *Service) GetTransactions(accountID, offset, limit int) ([]transaction.Transaction, error) {
+func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit int) ([]transaction.Transaction, error) {
 	if accountID <= 0 {
 		return nil, ErrInvalidAccountID
 	}
 
-	_, err := s.store.GetAccount(accountID)
+	_, err := s.store.GetAccount(ctx, accountID)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return nil, ErrAccountNotFound
 	}
@@ -114,7 +119,10 @@ func (s *Service) GetTransactions(accountID, offset, limit int) ([]transaction.T
 		return nil, err
 	}
 
-	accTrans := s.store.GetTransactions(accountID, offset, limit)
+	accTrans, err := s.store.GetTransactions(ctx, accountID, offset, limit)
+	if err != nil {
+		return nil, err
+	}
 
 	return accTrans, nil
 }

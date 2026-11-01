@@ -1,9 +1,11 @@
 package handler
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"go-payment-platform/internal/validation"
 )
@@ -31,7 +33,10 @@ func (h *Handler) GetAccountTransactions(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	accTrans, err := h.service.GetTransactions(idInt, offset, limit)
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+
+	accTrans, err := h.service.GetTransactions(ctx, idInt, offset, limit)
 	if err != nil {
 		handleError(w, err)
 		return
