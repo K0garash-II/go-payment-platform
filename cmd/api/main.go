@@ -41,7 +41,7 @@ func main() {
 	defer store.Close()
 
 	p := payment.NewService(store)
-	router := httpapi.NewRouter(p, logger)
+	router := httpapi.NewRouter(p, logger, cfg.JWTSecret)
 
 	logger.Info("Starting server", "address", ":8080")
 

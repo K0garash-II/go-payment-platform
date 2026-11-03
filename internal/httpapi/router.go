@@ -9,10 +9,10 @@ import (
 	"go-payment-platform/internal/payment"
 )
 
-func NewRouter(p *payment.Service, logger *slog.Logger) http.Handler {
+func NewRouter(p *payment.Service, logger *slog.Logger, jwtSecret string) http.Handler {
 	mux := http.NewServeMux()
 
-	h := handler.NewHandler(p, logger)
+	h := handler.NewHandler(p, logger, jwtSecret)
 
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("ok")); err != nil {

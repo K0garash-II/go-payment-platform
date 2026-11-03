@@ -7,13 +7,15 @@ import (
 )
 
 type Handler struct {
-	service *payment.Service
-	logger  *slog.Logger
+	service   *payment.Service
+	logger    *slog.Logger
+	jwtSecret []byte
 }
 
-func NewHandler(service *payment.Service, logger *slog.Logger) *Handler {
+func NewHandler(service *payment.Service, logger *slog.Logger, jwtSecret string) *Handler {
 	return &Handler{
-		service: service,
-		logger:  logger,
+		service:   service,
+		logger:    logger,
+		jwtSecret: []byte(jwtSecret),
 	}
 }

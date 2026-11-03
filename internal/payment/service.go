@@ -47,7 +47,7 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (user.User, 
 	if errors.Is(err, storage.ErrUserNotFound) {
 		return user.User{}, ErrUserNotFound
 	}
-	
+
 	if err != nil {
 		return user.User{}, err
 	}

@@ -129,7 +129,7 @@ func setupTestServer(t *testing.T) *testEnv {
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	service := payment.NewService(store)
 
-	env.server = NewRouter(service, logger)
+	env.server = NewRouter(service, logger, cfg.JWTSecret)
 
 	return env
 }

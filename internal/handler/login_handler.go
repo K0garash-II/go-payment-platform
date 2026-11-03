@@ -2,11 +2,12 @@ package handler
 
 import (
 	"context"
+	"net/http"
+	"time"
+
 	"go-payment-platform/internal/auth"
 	"go-payment-platform/internal/dto"
 	"go-payment-platform/internal/validation"
-	"net/http"
-	"time"
 )
 
 func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
@@ -40,6 +41,13 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 	err = auth.CheckPassword(password, u.PasswordHash)
 	if err != nil {
 		http.Error(w, "invalid credentials", http.StatusUnauthorized)
+		return
+	}
+
+	//accessToken, err := auth.GenerateAccessToken(u.ID, h.jwtSecret)
+	if err != nil {
+		h.logger.Error("failed to generate access token", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
 }
