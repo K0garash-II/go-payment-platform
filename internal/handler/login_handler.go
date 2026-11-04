@@ -56,7 +56,7 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		Value:    accessToken,
 		Path:     "/",
 		HttpOnly: true,
-		Secure:   false,  //than change to https
+		Secure:   false, //than change to https
 		SameSite: http.SameSiteLaxMode,
 		Expires:  time.Now().Add(15 * time.Minute),
 	})

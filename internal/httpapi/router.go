@@ -14,6 +14,8 @@ func NewRouter(p *payment.Service, logger *slog.Logger, jwtSecret string) http.H
 
 	h := handler.NewHandler(p, logger, jwtSecret)
 
+	authMiddleware := middleware.AuthMiddleware([]byte(jwtSecret))
+
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		if _, err := w.Write([]byte("ok")); err != nil {
 			logger.Error("failed to write health response", "error", err)
@@ -22,10 +24,10 @@ func NewRouter(p *payment.Service, logger *slog.Logger, jwtSecret string) http.H
 
 	mux.HandleFunc("POST /register", h.RegisterUser)
 	mux.HandleFunc("POST /login", h.LoginUser)
-	mux.HandleFunc("GET /accounts/{id}", h.GetAccount)
-	mux.HandleFunc("POST /deposits", h.DepositAccount)
-	mux.HandleFunc("POST /transfers", h.TransferAccount)
-	mux.HandleFunc("GET /accounts/{id}/transactions", h.GetAccountTransactions)
+	mux.Handle("GET /accounts/{id}", authMiddleware(http.HandlerFunc(h.GetAccount)))
+	mux.Handle("POST /deposits", authMiddleware(http.HandlerFunc(h.DepositAccount)))
+	mux.Handle("POST /transfers", authMiddleware(http.HandlerFunc(h.TransferAccount)))
+	mux.Handle("GET /accounts/{id}/transactions", authMiddleware(http.HandlerFunc(h.GetAccountTransactions)))
 
 	return middleware.LoggingMiddleware(logger)(mux)
 }
