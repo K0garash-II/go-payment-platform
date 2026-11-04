@@ -44,10 +44,22 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	//accessToken, err := auth.GenerateAccessToken(u.ID, h.jwtSecret)
+	accessToken, err := auth.GenerateAccessToken(u.ID, h.jwtSecret)
 	if err != nil {
 		h.logger.Error("failed to generate access token", "error", err)
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 		return
 	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "access_token",
+		Value:    accessToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,  //than change to https
+		SameSite: http.SameSiteLaxMode,
+		Expires:  time.Now().Add(15 * time.Minute),
+	})
+
+	w.WriteHeader(http.StatusOK)
 }
