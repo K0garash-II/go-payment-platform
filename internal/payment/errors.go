@@ -11,4 +11,5 @@ var (
 	ErrInvalidAccountID   = errors.New("invalid account id")
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidUserID      = errors.New("invalid user id")
 )

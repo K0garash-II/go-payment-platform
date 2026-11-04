@@ -89,15 +89,15 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (user.User, er
 	return u, nil
 }
 
-func (s *Store) GetAccount(ctx context.Context, id int) (account.Account, error) {
+func (s *Store) GetAccount(ctx context.Context, id int, userID int) (account.Account, error) {
 	return scanAccount(s.pool.QueryRow(
 		ctx,
-		"SELECT id, user_id, balance FROM accounts WHERE id = $1",
-		id,
+		"SELECT id, user_id, balance FROM accounts WHERE id = $1 AND user_id = $2",
+		id, userID,
 	))
 }
 
-func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Account, error) {
+func (s *Store) Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return account.Account{}, err
@@ -111,10 +111,10 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Acco
 		ctx,
 		`UPDATE accounts
 		 SET balance = balance + $1
-		 WHERE id = $2
+		 WHERE id = $2 AND user_id = $3
 		 AND balance <= 9223372036854775807 - $1
 		 RETURNING id, user_id, balance`,
-		amount, id,
+		amount, id, userID,
 	))
 
 	if errors.Is(err, storage.ErrAccountNotFound) {
@@ -122,8 +122,8 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Acco
 
 		err = tx.QueryRow(
 			ctx,
-			"SELECT EXISTS(SELECT 1 FROM accounts WHERE id = $1)",
-			id,
+			"SELECT EXISTS(SELECT 1 FROM accounts WHERE id = $1 AND user_id = $2)",
+			id, userID,
 		).Scan(&exists)
 
 		if err != nil {
@@ -152,7 +152,7 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64) (account.Acco
 	return acc, nil
 }
 
-func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) error {
+func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -193,20 +193,25 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 		accFrom, accTo = second, first
 	}
 
-	if accFrom.Balance < amount {
-		return storage.ErrInsufficientFunds
-	}
-
-	_, err = tx.Exec(
+	tag, err := tx.Exec(
 		ctx,
-		"UPDATE accounts SET balance = balance - $1 WHERE id = $2",
-		amount, accFrom.ID,
+		`UPDATE accounts
+         SET balance = balance - $1
+         WHERE id = $2 AND user_id = $3 AND balance >= $1`,
+		amount, accFrom.ID, userID,
 	)
 	if err != nil {
 		return err
 	}
 
-	tag, err := tx.Exec(
+	if tag.RowsAffected() == 0 {
+		if accFrom.UserID != userID {
+			return storage.ErrAccountNotFound
+		}
+		return storage.ErrInsufficientFunds
+	}
+
+	tag, err = tx.Exec(
 		ctx,
 		`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND balance <= $3::bigint - $1::bigint`,
 		amount, accTo.ID, int64(math.MaxInt64),
@@ -234,17 +239,17 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64) er
 	return nil
 }
 
-func (s *Store) GetTransactions(ctx context.Context, accountID, offset, limit int) ([]transaction.Transaction, error) {
+func (s *Store) GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error) {
 	var history []transaction.Transaction
 
 	rows, err := s.pool.Query(
 		ctx,
 		`SELECT id, account_id, type, amount, created_at
      FROM transactions
-     WHERE account_id = $1
+     WHERE account_id = $1 AND user_id = $2
      ORDER BY created_at DESC, id DESC
-     LIMIT $2 OFFSET $3`,
-		accountID, limit, offset,
+     LIMIT $3 OFFSET $4`,
+		accountID, userID, limit, offset,
 	)
 	if err != nil {
 		return nil, err

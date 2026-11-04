@@ -23,10 +23,10 @@ func NewService(store AccountStore) *Service {
 type AccountStore interface {
 	RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error)
 	GetUserByEmail(ctx context.Context, email string) (user.User, error)
-	GetAccount(ctx context.Context, id int) (account.Account, error)
-	Deposit(ctx context.Context, id int, amount int64) (account.Account, error)
-	Transfer(ctx context.Context, fromID, toID int, amount int64) error
-	GetTransactions(ctx context.Context, accountID, offset, limit int) ([]transaction.Transaction, error)
+	GetAccount(ctx context.Context, id int, userID int) (account.Account, error)
+	Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error)
+	Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error
+	GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error)
 }
 
 func (s *Service) RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error) {
@@ -55,12 +55,16 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (user.User, 
 	return u, nil
 }
 
-func (s *Service) GetAccount(ctx context.Context, id int) (account.Account, error) {
+func (s *Service) GetAccount(ctx context.Context, id int, userID int) (account.Account, error) {
 	if id <= 0 {
 		return account.Account{}, ErrInvalidAccountID
 	}
 
-	acc, err := s.store.GetAccount(ctx, id)
+	if userID <= 0 {
+		return account.Account{}, ErrInvalidUserID
+	}
+
+	acc, err := s.store.GetAccount(ctx, id, userID)
 
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return account.Account{}, ErrAccountNotFound
@@ -72,7 +76,7 @@ func (s *Service) GetAccount(ctx context.Context, id int) (account.Account, erro
 	return acc, nil
 }
 
-func (s *Service) Deposit(ctx context.Context, id int, amount int64) (account.Account, error) {
+func (s *Service) Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error) {
 	if amount <= 0 {
 		return account.Account{}, ErrInvalidAmount
 	}
@@ -81,7 +85,11 @@ func (s *Service) Deposit(ctx context.Context, id int, amount int64) (account.Ac
 		return account.Account{}, ErrInvalidAccountID
 	}
 
-	acc, err := s.store.Deposit(ctx, id, amount)
+	if userID <= 0 {
+		return account.Account{}, ErrInvalidUserID
+	}
+
+	acc, err := s.store.Deposit(ctx, id, amount, userID)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return account.Account{}, ErrAccountNotFound
 	}
@@ -95,7 +103,7 @@ func (s *Service) Deposit(ctx context.Context, id int, amount int64) (account.Ac
 	return acc, nil
 }
 
-func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64) error {
+func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error {
 	if amount <= 0 {
 		return ErrInvalidAmount
 	}
@@ -108,7 +116,7 @@ func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64) 
 		return ErrSameAccount
 	}
 
-	err := s.store.Transfer(ctx, fromID, toID, amount)
+	err := s.store.Transfer(ctx, fromID, toID, amount, userID)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return ErrAccountNotFound
 	}
@@ -125,12 +133,12 @@ func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64) 
 	return nil
 }
 
-func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit int) ([]transaction.Transaction, error) {
+func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error) {
 	if accountID <= 0 {
 		return nil, ErrInvalidAccountID
 	}
 
-	_, err := s.store.GetAccount(ctx, accountID)
+	_, err := s.store.GetAccount(ctx, accountID, userID)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return nil, ErrAccountNotFound
 	}
@@ -138,7 +146,7 @@ func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit 
 		return nil, err
 	}
 
-	accTrans, err := s.store.GetTransactions(ctx, accountID, offset, limit)
+	accTrans, err := s.store.GetTransactions(ctx, accountID, offset, limit, userID)
 	if err != nil {
 		return nil, err
 	}

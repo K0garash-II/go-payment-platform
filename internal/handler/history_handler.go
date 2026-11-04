@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"go-payment-platform/internal/middleware"
 	"go-payment-platform/internal/validation"
 )
 
@@ -15,6 +16,12 @@ func (h *Handler) GetAccountTransactions(w http.ResponseWriter, r *http.Request)
 	idInt, err := strconv.Atoi(id)
 	if err != nil || idInt <= 0 {
 		http.Error(w, "invalid account ID", http.StatusBadRequest)
+		return
+	}
+
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
 
@@ -36,7 +43,7 @@ func (h *Handler) GetAccountTransactions(w http.ResponseWriter, r *http.Request)
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	accTrans, err := h.service.GetTransactions(ctx, idInt, offset, limit)
+	accTrans, err := h.service.GetTransactions(ctx, idInt, offset, limit, userID)
 	if err != nil {
 		handleError(w, err)
 		return

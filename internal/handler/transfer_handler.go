@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"go-payment-platform/internal/dto"
+	"go-payment-platform/internal/middleware"
 	"go-payment-platform/internal/validation"
 )
 
@@ -19,7 +20,13 @@ func (h *Handler) TransferAccount(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	err := h.service.Transfer(ctx, input.FromID, input.ToID, input.Amount)
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	err := h.service.Transfer(ctx, input.FromID, input.ToID, input.Amount, userID)
 	if err != nil {
 		handleError(w, err)
 		return

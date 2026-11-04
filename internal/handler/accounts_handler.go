@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"strconv"
 	"time"
+
+	"go-payment-platform/internal/middleware"
 )
 
 func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
@@ -16,10 +18,16 @@ func (h *Handler) GetAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	userID, ok := middleware.GetUserID(r.Context())
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	acc, err := h.service.GetAccount(ctx, idInt)
+	acc, err := h.service.GetAccount(ctx, idInt, userID)
 	if err != nil {
 		handleError(w, err)
 		return
