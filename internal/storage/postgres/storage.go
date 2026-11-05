@@ -244,11 +244,18 @@ func (s *Store) GetTransactions(ctx context.Context, accountID, offset, limit in
 
 	rows, err := s.pool.Query(
 		ctx,
-		`SELECT id, account_id, type, amount, created_at
-     FROM transactions
-     WHERE account_id = $1 AND user_id = $2
-     ORDER BY created_at DESC, id DESC
-     LIMIT $3 OFFSET $4`,
+		`SELECT
+    t.id,
+    t.account_id,
+    t.type,
+    t.amount,
+    t.created_at
+	FROM transactions t
+	JOIN accounts a ON a.id = t.account_id
+	WHERE t.account_id = $1
+  	AND a.user_id = $2
+	ORDER BY t.created_at DESC, t.id DESC
+	LIMIT $3 OFFSET $4`,
 		accountID, userID, limit, offset,
 	)
 	if err != nil {

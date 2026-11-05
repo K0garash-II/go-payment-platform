@@ -17,14 +17,14 @@ func (h *Handler) TransferAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
 	userID, ok := middleware.GetUserID(r.Context())
 	if !ok {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
 
 	err := h.service.Transfer(ctx, input.FromID, input.ToID, input.Amount, userID)
 	if err != nil {

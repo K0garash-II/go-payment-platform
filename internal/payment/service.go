@@ -116,6 +116,10 @@ func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64, 
 		return ErrSameAccount
 	}
 
+	if userID <= 0 {
+		return ErrInvalidUserID
+	}
+
 	err := s.store.Transfer(ctx, fromID, toID, amount, userID)
 	if errors.Is(err, storage.ErrAccountNotFound) {
 		return ErrAccountNotFound
@@ -136,6 +140,10 @@ func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64, 
 func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error) {
 	if accountID <= 0 {
 		return nil, ErrInvalidAccountID
+	}
+
+	if userID <= 0 {
+		return nil, ErrInvalidUserID
 	}
 
 	_, err := s.store.GetAccount(ctx, accountID, userID)
