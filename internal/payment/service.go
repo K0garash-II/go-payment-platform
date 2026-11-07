@@ -3,6 +3,7 @@ package payment
 import (
 	"context"
 	"errors"
+	"time"
 
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
@@ -27,6 +28,7 @@ type AccountStore interface {
 	Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error)
 	Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error
 	GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error)
+	CreateSession(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error
 }
 
 func (s *Service) RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error) {
@@ -160,4 +162,8 @@ func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit 
 	}
 
 	return accTrans, nil
+}
+
+func (s *Service) CreateSession(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error {
+	return nil
 }

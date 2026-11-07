@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"time"
 
 	"go-payment-platform/internal/account"
 	"go-payment-platform/internal/storage"
@@ -285,6 +286,10 @@ func (s *Store) GetTransactions(ctx context.Context, accountID, offset, limit in
 	}
 
 	return history, nil
+}
+
+func (s *Store) CreateSession(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error {
+	return nil
 }
 
 func NewStore(ctx context.Context, connString string) (*Store, error) {

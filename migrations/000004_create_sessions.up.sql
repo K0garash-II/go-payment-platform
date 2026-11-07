@@ -5,3 +5,6 @@ CREATE TABLE sessions (
     expires_at TIMESTAMPTZ NOT NULL,
     revoked_at TIMESTAMPTZ
 );
+
+CREATE INDEX idx_sessions_user_id
+ON sessions(user_id);
