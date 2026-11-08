@@ -28,7 +28,7 @@ type AccountStore interface {
 	Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error)
 	Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error
 	GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error)
-	CreateSession(ctx context.Context, userID int, tokenHash string, sessionExpiresAt time.Time, tokenExpiresAt time.Time) error 
+	CreateSession(ctx context.Context, userID int, tokenHash string, sessionExpiresAt time.Time, tokenExpiresAt time.Time) error
 }
 
 func (s *Service) RegisterUser(
@@ -121,7 +121,7 @@ func (s *Service) Deposit(
 }
 
 func (s *Service) Transfer(
-	ctx context.Context, fromID, toID int, 
+	ctx context.Context, fromID, toID int,
 	amount int64, userID int,
 ) error {
 
@@ -159,7 +159,7 @@ func (s *Service) Transfer(
 }
 
 func (s *Service) GetTransactions(
-	ctx context.Context, accountID, 
+	ctx context.Context, accountID,
 	offset, limit int, userID int,
 ) ([]transaction.Transaction, error) {
 
@@ -188,9 +188,30 @@ func (s *Service) GetTransactions(
 }
 
 func (s *Service) CreateSession(
-    ctx context.Context, userID int, tokenHash string,
-    sessionExpiresAt time.Time, tokenExpiresAt time.Time,
+	ctx context.Context, userID int, tokenHash string,
+	sessionExpiresAt time.Time, tokenExpiresAt time.Time,
 ) error {
+	if userID <= 0 {
+		return ErrInvalidUserID
+	}
 
-	return nil
+	if tokenHash == "" {
+		return ErrInvalidSession
+	}
+
+	now := time.Now()
+
+	if !sessionExpiresAt.After(now) {
+		return ErrInvalidSession
+	}
+
+	if !tokenExpiresAt.After(now) {
+		return ErrInvalidSession
+	}
+
+	if tokenExpiresAt.After(sessionExpiresAt) {
+		return ErrInvalidSession
+	}
+
+	return s.store.CreateSession(ctx, userID, tokenHash, sessionExpiresAt, tokenExpiresAt)
 }
