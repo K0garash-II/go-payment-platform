@@ -22,7 +22,7 @@ type Store struct {
 }
 
 func (s *Store) RegisterUser(
-	ctx context.Context, 
+	ctx context.Context,
 	email string, passwordHash string,
 ) (user.User, account.Account, error) {
 
@@ -101,7 +101,7 @@ func (s *Store) GetUserByEmail(
 }
 
 func (s *Store) GetAccount(
-	ctx context.Context, 
+	ctx context.Context,
 	id int, userID int,
 ) (account.Account, error) {
 
@@ -115,7 +115,7 @@ func (s *Store) GetAccount(
 }
 
 func (s *Store) Deposit(
-	ctx context.Context, id int, 
+	ctx context.Context, id int,
 	amount int64, userID int,
 ) (account.Account, error) {
 
@@ -176,7 +176,7 @@ func (s *Store) Deposit(
 }
 
 func (s *Store) Transfer(
-	ctx context.Context, fromID, toID int, 
+	ctx context.Context, fromID, toID int,
 	amount int64, userID int,
 ) error {
 
@@ -270,7 +270,7 @@ func (s *Store) Transfer(
 }
 
 func (s *Store) GetTransactions(
-	ctx context.Context, accountID, 
+	ctx context.Context, accountID,
 	offset, limit int, userID int,
 ) ([]transaction.Transaction, error) {
 
@@ -322,8 +322,8 @@ func (s *Store) GetTransactions(
 }
 
 func (s *Store) CreateSession(
-    ctx context.Context, userID int, tokenHash string,
-    sessionExpiresAt time.Time, tokenExpiresAt time.Time,
+	ctx context.Context, userID int, tokenHash string,
+	sessionExpiresAt time.Time, tokenExpiresAt time.Time,
 ) error {
 
 	tx, err := s.pool.Begin(ctx)
