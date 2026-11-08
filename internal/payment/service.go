@@ -28,10 +28,14 @@ type AccountStore interface {
 	Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error)
 	Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error
 	GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error)
-	CreateSession(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error
+	CreateSession(ctx context.Context, userID int, tokenHash string, sessionExpiresAt time.Time, tokenExpiresAt time.Time) error 
 }
 
-func (s *Service) RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error) {
+func (s *Service) RegisterUser(
+	ctx context.Context,
+	email string, passwordHash string,
+) (user.User, account.Account, error) {
+
 	u, acc, err := s.store.RegisterUser(ctx, email, passwordHash)
 
 	if errors.Is(err, storage.ErrEmailAlreadyExists) {
@@ -44,7 +48,10 @@ func (s *Service) RegisterUser(ctx context.Context, email string, passwordHash s
 	return u, acc, nil
 }
 
-func (s *Service) GetUserByEmail(ctx context.Context, email string) (user.User, error) {
+func (s *Service) GetUserByEmail(
+	ctx context.Context, email string,
+) (user.User, error) {
+
 	u, err := s.store.GetUserByEmail(ctx, email)
 	if errors.Is(err, storage.ErrUserNotFound) {
 		return user.User{}, ErrUserNotFound
@@ -57,7 +64,11 @@ func (s *Service) GetUserByEmail(ctx context.Context, email string) (user.User, 
 	return u, nil
 }
 
-func (s *Service) GetAccount(ctx context.Context, id int, userID int) (account.Account, error) {
+func (s *Service) GetAccount(
+	ctx context.Context,
+	id int, userID int,
+) (account.Account, error) {
+
 	if id <= 0 {
 		return account.Account{}, ErrInvalidAccountID
 	}
@@ -78,7 +89,11 @@ func (s *Service) GetAccount(ctx context.Context, id int, userID int) (account.A
 	return acc, nil
 }
 
-func (s *Service) Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error) {
+func (s *Service) Deposit(
+	ctx context.Context, id int,
+	amount int64, userID int,
+) (account.Account, error) {
+
 	if amount <= 0 {
 		return account.Account{}, ErrInvalidAmount
 	}
@@ -105,7 +120,11 @@ func (s *Service) Deposit(ctx context.Context, id int, amount int64, userID int)
 	return acc, nil
 }
 
-func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error {
+func (s *Service) Transfer(
+	ctx context.Context, fromID, toID int, 
+	amount int64, userID int,
+) error {
+
 	if amount <= 0 {
 		return ErrInvalidAmount
 	}
@@ -139,7 +158,11 @@ func (s *Service) Transfer(ctx context.Context, fromID, toID int, amount int64, 
 	return nil
 }
 
-func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error) {
+func (s *Service) GetTransactions(
+	ctx context.Context, accountID, 
+	offset, limit int, userID int,
+) ([]transaction.Transaction, error) {
+
 	if accountID <= 0 {
 		return nil, ErrInvalidAccountID
 	}
@@ -164,6 +187,10 @@ func (s *Service) GetTransactions(ctx context.Context, accountID, offset, limit 
 	return accTrans, nil
 }
 
-func (s *Service) CreateSession(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error {
+func (s *Service) CreateSession(
+    ctx context.Context, userID int, tokenHash string,
+    sessionExpiresAt time.Time, tokenExpiresAt time.Time,
+) error {
+
 	return nil
 }

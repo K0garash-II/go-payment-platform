@@ -21,7 +21,11 @@ type Store struct {
 	pool *pgxpool.Pool
 }
 
-func (s *Store) RegisterUser(ctx context.Context, email string, passwordHash string) (user.User, account.Account, error) {
+func (s *Store) RegisterUser(
+	ctx context.Context, 
+	email string, passwordHash string,
+) (user.User, account.Account, error) {
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return user.User{}, account.Account{}, err
@@ -55,7 +59,8 @@ func (s *Store) RegisterUser(ctx context.Context, email string, passwordHash str
 
 	err = tx.QueryRow(
 		ctx,
-		"INSERT INTO accounts (user_id) VALUES ($1) RETURNING id, user_id, balance",
+		`INSERT INTO accounts (user_id) 
+		 VALUES ($1) RETURNING id, user_id, balance`,
 		u.ID,
 	).Scan(&acc.ID, &acc.UserID, &acc.Balance)
 
@@ -70,12 +75,17 @@ func (s *Store) RegisterUser(ctx context.Context, email string, passwordHash str
 	return u, acc, nil
 }
 
-func (s *Store) GetUserByEmail(ctx context.Context, email string) (user.User, error) {
+func (s *Store) GetUserByEmail(
+	ctx context.Context, email string,
+) (user.User, error) {
+
 	var u user.User
 
 	err := s.pool.QueryRow(
 		ctx,
-		"SELECT id, email, password_hash, created_at FROM users WHERE email = $1",
+		`SELECT id, email, password_hash, created_at 
+		 FROM users 
+		 WHERE email = $1`,
 		email,
 	).Scan(&u.ID, &u.Email, &u.PasswordHash, &u.CreatedAt)
 
@@ -90,15 +100,25 @@ func (s *Store) GetUserByEmail(ctx context.Context, email string) (user.User, er
 	return u, nil
 }
 
-func (s *Store) GetAccount(ctx context.Context, id int, userID int) (account.Account, error) {
+func (s *Store) GetAccount(
+	ctx context.Context, 
+	id int, userID int,
+) (account.Account, error) {
+
 	return scanAccount(s.pool.QueryRow(
 		ctx,
-		"SELECT id, user_id, balance FROM accounts WHERE id = $1 AND user_id = $2",
+		`SELECT id, user_id, balance 
+		 FROM accounts 
+		 WHERE id = $1 AND user_id = $2`,
 		id, userID,
 	))
 }
 
-func (s *Store) Deposit(ctx context.Context, id int, amount int64, userID int) (account.Account, error) {
+func (s *Store) Deposit(
+	ctx context.Context, id int, 
+	amount int64, userID int,
+) (account.Account, error) {
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return account.Account{}, err
@@ -123,7 +143,9 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64, userID int) (
 
 		err = tx.QueryRow(
 			ctx,
-			"SELECT EXISTS(SELECT 1 FROM accounts WHERE id = $1 AND user_id = $2)",
+			`SELECT EXISTS(SELECT 1 
+			 FROM accounts 
+			 WHERE id = $1 AND user_id = $2)`,
 			id, userID,
 		).Scan(&exists)
 
@@ -153,7 +175,11 @@ func (s *Store) Deposit(ctx context.Context, id int, amount int64, userID int) (
 	return acc, nil
 }
 
-func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error {
+func (s *Store) Transfer(
+	ctx context.Context, fromID, toID int, 
+	amount int64, userID int,
+) error {
+
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -172,7 +198,8 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64, us
 
 	first, err := scanAccount(tx.QueryRow(
 		ctx,
-		"SELECT id, user_id, balance FROM accounts WHERE id = $1 FOR UPDATE",
+		`SELECT id, user_id, balance 
+		 FROM accounts WHERE id = $1 FOR UPDATE`,
 		firstID,
 	))
 	if err != nil {
@@ -181,7 +208,8 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64, us
 
 	second, err := scanAccount(tx.QueryRow(
 		ctx,
-		"SELECT id, user_id, balance FROM accounts WHERE id = $1 FOR UPDATE",
+		`SELECT id, user_id, balance 
+		 FROM accounts WHERE id = $1 FOR UPDATE`,
 		secondID,
 	))
 	if err != nil {
@@ -214,7 +242,8 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64, us
 
 	tag, err = tx.Exec(
 		ctx,
-		`UPDATE accounts SET balance = balance + $1 WHERE id = $2 AND balance <= $3::bigint - $1::bigint`,
+		`UPDATE accounts SET balance = balance + $1 
+		 WHERE id = $2 AND balance <= $3::bigint - $1::bigint`,
 		amount, accTo.ID, int64(math.MaxInt64),
 	)
 	if err != nil {
@@ -240,23 +269,27 @@ func (s *Store) Transfer(ctx context.Context, fromID, toID int, amount int64, us
 	return nil
 }
 
-func (s *Store) GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error) {
+func (s *Store) GetTransactions(
+	ctx context.Context, accountID, 
+	offset, limit int, userID int,
+) ([]transaction.Transaction, error) {
+
 	var history []transaction.Transaction
 
 	rows, err := s.pool.Query(
 		ctx,
 		`SELECT
-    t.id,
-    t.account_id,
-    t.type,
-    t.amount,
-    t.created_at
-	FROM transactions t
-	JOIN accounts a ON a.id = t.account_id
-	WHERE t.account_id = $1
-  	AND a.user_id = $2
-	ORDER BY t.created_at DESC, t.id DESC
-	LIMIT $3 OFFSET $4`,
+    	 t.id,
+    	 t.account_id,
+	     t.type,
+    	 t.amount,
+	     t.created_at
+		 FROM transactions t
+		 JOIN accounts a ON a.id = t.account_id
+		 WHERE t.account_id = $1
+  		 AND a.user_id = $2
+		 ORDER BY t.created_at DESC, t.id DESC
+		 LIMIT $3 OFFSET $4`,
 		accountID, userID, limit, offset,
 	)
 	if err != nil {
@@ -288,7 +321,52 @@ func (s *Store) GetTransactions(ctx context.Context, accountID, offset, limit in
 	return history, nil
 }
 
-func (s *Store) CreateSession(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error {
+func (s *Store) CreateSession(
+    ctx context.Context, userID int, tokenHash string,
+    sessionExpiresAt time.Time, tokenExpiresAt time.Time,
+) error {
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var sessionID int
+
+	err = tx.QueryRow(
+		ctx,
+		`INSERT INTO sessions (user_id, expires_at)
+         VALUES ($1, $2)
+         RETURNING id`,
+		userID,
+		sessionExpiresAt,
+	).Scan(&sessionID)
+
+	if err != nil {
+		return err
+	}
+
+	_, err = tx.Exec(
+		ctx,
+		`INSERT INTO refresh_tokens 
+		 (session_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)`,
+		sessionID,
+		tokenHash,
+		tokenExpiresAt,
+	)
+
+	if err != nil {
+		return err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return err
+	}
+
 	return nil
 }
 
