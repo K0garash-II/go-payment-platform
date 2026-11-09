@@ -370,6 +370,75 @@ func (s *Store) CreateSession(
 	return nil
 }
 
+func (s *Store) RotateRefreshToken(
+	ctx context.Context, 
+	tokenHash, newTokenHash string, 
+	tokenExpiresAt time.Time,
+) (int, error) {
+
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		_ = tx.Rollback(ctx)
+	}()
+
+	var userID, sessionID int
+
+	err = tx.QueryRow(
+		ctx,
+		`SELECT r.session_id, s.user_id
+		 FROM refresh_tokens r
+		 JOIN sessions s ON s.id = r.session_id
+		 WHERE r.token_hash = $1 
+		 AND r.used_at IS NULL
+		 AND r.revoked_at IS NULL
+		 AND r.expires_at > NOW()
+		 AND s.revoked_at IS NULL
+		 AND s.expires_at > NOW()
+		 FOR UPDATE`,
+		tokenHash,
+	).Scan(&sessionID, &userID)
+
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = tx.Exec(
+		ctx,
+		`UPDATE refresh_tokens
+         SET used_at = NOW()
+         WHERE token_hash = $1
+		 AND used_at IS NULL`,
+		tokenHash,
+	)
+
+	if err != nil {
+		return 0, err
+	}
+
+	_, err = tx.Exec(
+		ctx,
+		`INSERT INTO refresh_tokens 
+		 (session_id, token_hash, expires_at)
+         VALUES ($1, $2, $3)`,
+		sessionID,
+		newTokenHash,
+		tokenExpiresAt,
+	)
+
+	if err != nil {
+		return 0, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+
+	return userID, nil
+}
+
 func NewStore(ctx context.Context, connString string) (*Store, error) {
 	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {

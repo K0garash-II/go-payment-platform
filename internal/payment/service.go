@@ -29,6 +29,7 @@ type AccountStore interface {
 	Transfer(ctx context.Context, fromID, toID int, amount int64, userID int) error
 	GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error)
 	CreateSession(ctx context.Context, userID int, tokenHash string, sessionExpiresAt time.Time, tokenExpiresAt time.Time) error
+	RotateRefreshToken(ctx context.Context, tokenHash string, newTokenHash string, tokenExpiresAt time.Time) (int, error)
 }
 
 func (s *Service) RegisterUser(
