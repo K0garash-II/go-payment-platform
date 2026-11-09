@@ -216,3 +216,30 @@ func (s *Service) CreateSession(
 
 	return s.store.CreateSession(ctx, userID, tokenHash, sessionExpiresAt, tokenExpiresAt)
 }
+
+func (s *Service) RotateRefreshToken(
+    ctx context.Context, 
+	tokenHash, newTokenHash string,
+    tokenExpiresAt time.Time,
+) (int, error) {
+
+	if tokenHash == "" || newTokenHash == "" {
+		return 0, ErrInvalidSession
+	}
+
+	now := time.Now()
+
+	if !tokenExpiresAt.After(now) {
+		return 0, ErrInvalidSession
+	}
+
+	if tokenHash == newTokenHash {
+		return 0, ErrInvalidSession
+	}
+
+	userID, err := s.store.RotateRefreshToken(ctx, tokenHash, newTokenHash, tokenExpiresAt)
+	if err != nil {
+		return 0, err
+	}
+	return userID, nil
+}
