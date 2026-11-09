@@ -44,6 +44,26 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshToken, err := auth.GenerateRefreshToken()
+	if err != nil {
+		h.logger.Error("failed to generate refresh token", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	refreshTokenHash := auth.HashRefreshToken(refreshToken)
+
+	now := time.Now()
+	sessionExpiresAt := now.Add(30 * 24 * time.Hour)
+	tokenExpiresAt := now.Add(7 * 24 * time.Hour)
+
+	err = h.service.CreateSession(ctx, u.ID, refreshTokenHash, sessionExpiresAt, tokenExpiresAt)
+	if err != nil {
+		h.logger.Error("failed to create session", "error", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
+
 	accessToken, err := auth.GenerateAccessToken(u.ID, h.jwtSecret)
 	if err != nil {
 		h.logger.Error("failed to generate access token", "error", err)
@@ -58,7 +78,17 @@ func (h *Handler) LoginUser(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: true,
 		Secure:   false, //than change to https
 		SameSite: http.SameSiteLaxMode,
-		Expires:  time.Now().Add(15 * time.Minute),
+		Expires:  now.Add(15 * time.Minute),
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "refresh_token",
+		Value:    refreshToken,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, //than change to https
+		SameSite: http.SameSiteLaxMode,
+		Expires:  tokenExpiresAt,
 	})
 
 	w.WriteHeader(http.StatusOK)
