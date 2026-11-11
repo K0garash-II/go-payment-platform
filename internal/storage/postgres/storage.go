@@ -459,6 +459,10 @@ func (s *Store) RevokeSessionByRefreshToken(
 		tokenHash,
 	).Scan(&id)
 
+	if errors.Is(err, pgx.ErrNoRows) {
+		return storage.ErrUserNotFound
+	}
+
 	if err != nil {
 		return err
 	}

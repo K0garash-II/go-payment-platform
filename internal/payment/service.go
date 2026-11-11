@@ -30,6 +30,7 @@ type AccountStore interface {
 	GetTransactions(ctx context.Context, accountID, offset, limit int, userID int) ([]transaction.Transaction, error)
 	CreateSession(ctx context.Context, userID int, tokenHash string, sessionExpiresAt time.Time, tokenExpiresAt time.Time) error
 	RotateRefreshToken(ctx context.Context, tokenHash string, newTokenHash string, tokenExpiresAt time.Time) (int, error)
+	RevokeSessionByRefreshToken(ctx context.Context, tokenHash string) error
 }
 
 func (s *Service) RegisterUser(
@@ -242,4 +243,25 @@ func (s *Service) RotateRefreshToken(
 		return 0, err
 	}
 	return userID, nil
+}
+
+func (s *Service) RevokeSessionByRefreshToken(
+	ctx context.Context, tokenHash string,
+) error {
+	
+	if tokenHash == ""{
+		return ErrInvalidSession
+	}
+
+	err := s.store.RevokeSessionByRefreshToken(ctx, tokenHash)
+
+	if errors.Is(err, storage.ErrInvalidSession) {
+		return ErrInvalidSession
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -8,4 +8,5 @@ var (
 	ErrBalanceOverflow    = errors.New("balance overflow")
 	ErrEmailAlreadyExists = errors.New("email already exists")
 	ErrUserNotFound       = errors.New("user not found")
+	ErrInvalidSession     = errors.New("invalid session")
 )
