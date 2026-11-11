@@ -439,6 +439,33 @@ func (s *Store) RotateRefreshToken(
 	return userID, nil
 }
 
+func (s *Store) RevokeSessionByRefreshToken(
+    ctx context.Context,
+    tokenHash string,
+) error {
+	var id int
+
+	err := s.pool.QueryRow(
+		ctx,
+		`UPDATE sessions
+		 SET revoked_at = NOW()
+		 WHERE id = (
+    	 SELECT session_id
+    	 FROM refresh_tokens
+    	 WHERE token_hash = $1
+		 )
+		 AND revoked_at IS NULL
+		 RETURNING id`,
+		tokenHash,
+	).Scan(&id)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func NewStore(ctx context.Context, connString string) (*Store, error) {
 	pool, err := pgxpool.New(ctx, connString)
 	if err != nil {
