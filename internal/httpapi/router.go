@@ -24,6 +24,7 @@ func NewRouter(p *payment.Service, logger *slog.Logger, jwtSecret string) http.H
 
 	mux.HandleFunc("POST /register", h.RegisterUser)
 	mux.HandleFunc("POST /login", h.LoginUser)
+	mux.HandleFunc("POST /refresh", h.RefreshToken)
 	mux.Handle("GET /accounts/{id}", authMiddleware(http.HandlerFunc(h.GetAccount)))
 	mux.Handle("POST /deposits", authMiddleware(http.HandlerFunc(h.DepositAccount)))
 	mux.Handle("POST /transfers", authMiddleware(http.HandlerFunc(h.TransferAccount)))
