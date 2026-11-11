@@ -218,9 +218,9 @@ func (s *Service) CreateSession(
 }
 
 func (s *Service) RotateRefreshToken(
-    ctx context.Context, 
+	ctx context.Context,
 	tokenHash, newTokenHash string,
-    tokenExpiresAt time.Time,
+	tokenExpiresAt time.Time,
 ) (int, error) {
 
 	if tokenHash == "" || newTokenHash == "" {

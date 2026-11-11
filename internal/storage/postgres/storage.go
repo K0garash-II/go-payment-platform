@@ -371,8 +371,8 @@ func (s *Store) CreateSession(
 }
 
 func (s *Store) RotateRefreshToken(
-	ctx context.Context, 
-	tokenHash, newTokenHash string, 
+	ctx context.Context,
+	tokenHash, newTokenHash string,
 	tokenExpiresAt time.Time,
 ) (int, error) {
 
