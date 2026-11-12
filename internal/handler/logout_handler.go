@@ -2,9 +2,10 @@ package handler
 
 import (
 	"context"
-	"go-payment-platform/internal/auth"
 	"net/http"
 	"time"
+
+	"go-payment-platform/internal/auth"
 )
 
 func (h *Handler) LogoutUser(w http.ResponseWriter, r *http.Request) {

@@ -440,8 +440,8 @@ func (s *Store) RotateRefreshToken(
 }
 
 func (s *Store) RevokeSessionByRefreshToken(
-    ctx context.Context,
-    tokenHash string,
+	ctx context.Context,
+	tokenHash string,
 ) error {
 	var id int
 

@@ -248,8 +248,8 @@ func (s *Service) RotateRefreshToken(
 func (s *Service) RevokeSessionByRefreshToken(
 	ctx context.Context, tokenHash string,
 ) error {
-	
-	if tokenHash == ""{
+
+	if tokenHash == "" {
 		return ErrInvalidSession
 	}
 
