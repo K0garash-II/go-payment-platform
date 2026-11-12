@@ -43,6 +43,9 @@ func handleError(w http.ResponseWriter, err error) {
 	case errors.Is(err, payment.ErrInvalidUserID):
 		http.Error(w, err.Error(), http.StatusBadRequest)
 
+	case errors.Is(err, payment.ErrInvalidSession):
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+
 	default:
 		http.Error(w, "internal server error", http.StatusInternalServerError)
 	}
